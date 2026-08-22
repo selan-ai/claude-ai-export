@@ -126,6 +126,11 @@ Both ends are undocumented internal APIs and can change without notice. If an
 export comes back with far fewer conversations than you expect, open an issue
 with the counts.
 
+## Privacy
+
+Nothing is collected, transmitted, or stored anywhere but your own Downloads
+folder. See [PRIVACY.md](PRIVACY.md).
+
 ## Licence
 
 MIT
