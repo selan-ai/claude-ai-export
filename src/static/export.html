@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Claude AI Export</title>
+    <link rel="stylesheet" href="export.css" />
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <h1>Claude AI Export</h1>
+        <p class="lede">Take your Claude data with you.</p>
+      </header>
+
+      <!-- Start -->
+      <section id="intro">
+        <ol class="steps">
+          <li><strong>We open claude.ai</strong> in a background tab, using the account you are already signed in to.</li>
+          <li><strong>We read your data</strong> — chats and their full history, projects, attachments, scheduled tasks.</li>
+          <li><strong>You get a .zip</strong> in your Downloads folder. That file is the whole export.</li>
+        </ol>
+
+        <p class="assure">
+          Everything happens inside this browser. Your conversations are never
+          sent to us or to anyone else — there is nowhere for them to go.
+        </p>
+
+        <fieldset class="range">
+          <legend>How far back?</legend>
+          <label>
+            <input type="radio" name="range" value="30" checked />
+            <span>Last 30 days<em>Fastest. Covers most recent work.</em></span>
+          </label>
+          <label>
+            <input type="radio" name="range" value="90" />
+            <span>Last 90 days<em>A quarter of history.</em></span>
+          </label>
+          <label>
+            <input type="radio" name="range" value="0" />
+            <span>Everything<em>Pick this if you are moving accounts. Takes longer.</em></span>
+          </label>
+        </fieldset>
+
+        <button id="go" class="primary">Start export</button>
+      </section>
+
+      <!-- Running / done -->
+      <section id="running" hidden>
+        <h2 id="status">Exporting…</h2>
+        <p class="lede" id="statusNote">Leave this tab open. It is safe to keep working elsewhere.</p>
+
+        <div class="progress" role="progressbar" aria-labelledby="pct">
+          <div id="bar"></div>
+        </div>
+        <p id="pct">Preparing…</p>
+
+        <div id="log" role="log" aria-live="polite"></div>
+
+        <div id="next" hidden>
+          <h3>Next: import into Claude Desktop</h3>
+          <ol class="steps compact">
+            <li>Open Claude Desktop</li>
+            <li><strong>Settings → Import &amp; export → Import…</strong></li>
+            <li>Choose <strong>claude-export.zip</strong> from your Downloads</li>
+          </ol>
+          <p class="note">
+            Re-running an import never creates duplicates, but it also does not
+            refresh chats that were imported before.
+          </p>
+        </div>
+
+        <button id="again" class="secondary" hidden>Export again</button>
+      </section>
+
+      <footer>
+        <a id="src" href="https://github.com/" target="_blank" rel="noopener noreferrer">
+          Open source — read every line
+        </a>
+        <p class="trust">
+          No trackers, no accounts, no runtime dependencies. The bundles here
+          are built from that source and nothing else — <code>npm run verify</code>
+          rebuilds them and fails if a byte differs. The only permission this
+          extension holds is to talk to claude.ai.
+        </p>
+      </footer>
+    </main>
+
+    <script src="page.js"></script>
+  </body>
+</html>

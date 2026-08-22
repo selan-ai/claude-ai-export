@@ -1,0 +1,350 @@
+/* Graphite — Selan's design system.
+   Token block copied verbatim from selan-control/web/graphite.css so the two
+   cannot drift on a colour. Dark only, as graphite is. */
+:root {
+  --g-ink: #171b22;
+  --g-panel: #1f252e;
+  --g-raise: #282f3a;
+  --g-sunken: #12161c;
+  --g-text: #ffffff;
+  --g-text-2: #d7dee7;
+  --g-muted: #b8c2cf;
+  --g-dim: #8f9bab;
+  --g-line: rgba(240, 243, 247, 0.1);
+  --g-line-2: rgba(240, 243, 247, 0.18);
+  --g-wash: rgba(240, 243, 247, 0.035);
+  --g-action: #8b6cff;
+  --g-action-hover: #a78bff;
+  --g-action-dim: rgba(139, 108, 255, 0.14);
+  --g-action-line: rgba(139, 108, 255, 0.42);
+  --g-on-action: #ffffff;
+  --g-action-text: #cdbcff;
+  --g-live: #3ddc97;
+  --g-live-text: #8ff0c8;
+  --g-danger-text: #ffb0be;
+  --g-focus: #cdbcff;
+  --g-radius-card: 12px;
+  --g-radius-control: 8px;
+  --g-radius-tile: 6px;
+  --g-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --g-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* 13px on a 1.4 line box, per base.css. Anything sized at a .5 states its own
+   line-height; everything here stays on whole even pixels. */
+body {
+  margin: 0;
+  padding: 48px 24px 64px;
+  font-family: var(--g-sans);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--g-text);
+  background: var(--g-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.top {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--g-line);
+}
+
+h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#next {
+  margin: 24px 0 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--g-line);
+  border-radius: var(--g-radius-card);
+  background: var(--g-panel);
+}
+
+.steps.compact li {
+  padding: 2px 0 2px 28px;
+  font-size: 12px;
+}
+
+.note {
+  margin: 12px 0 0;
+  color: var(--g-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--g-focus);
+  outline-offset: 2px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--g-muted);
+}
+
+/* Steps ---------------------------------------------------------------- */
+.steps {
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+  counter-reset: s;
+}
+
+.steps li {
+  counter-increment: s;
+  position: relative;
+  min-height: 22px;
+  padding: 7px 0 7px 32px;
+  color: var(--g-text-2);
+}
+
+.steps li::before {
+  content: counter(s);
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--g-radius-tile);
+  background: var(--g-action-dim);
+  color: var(--g-action-text);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.steps strong {
+  color: var(--g-text);
+  font-weight: 600;
+}
+
+/* Assurance ------------------------------------------------------------ */
+.assure {
+  margin: 0 0 26px;
+  padding: 10px 12px;
+  border: 1px solid var(--g-line);
+  border-radius: var(--g-radius-control);
+  background: var(--g-wash);
+  color: var(--g-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Range ---------------------------------------------------------------- */
+.range {
+  margin: 0 0 26px;
+  padding: 0;
+  border: 0;
+}
+
+.range legend {
+  padding: 0 0 8px;
+  color: var(--g-dim);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.range label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--g-radius-tile);
+  color: var(--g-text-2);
+  cursor: pointer;
+}
+
+.range label:hover {
+  background: var(--g-wash);
+}
+
+.range label:has(:checked) {
+  border-color: var(--g-action-line);
+  background: var(--g-action-dim);
+  color: var(--g-text);
+}
+
+.range input {
+  margin: 0;
+  accent-color: var(--g-action);
+}
+
+.range em {
+  display: block;
+  color: var(--g-dim);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+/* Buttons -------------------------------------------------------------- */
+button {
+  min-width: 180px;
+  height: 40px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--g-radius-control);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--g-action);
+  color: var(--g-on-action);
+}
+
+.primary:hover {
+  background: var(--g-action-hover);
+}
+
+.primary:disabled {
+  background: var(--g-raise);
+  color: var(--g-dim);
+  cursor: default;
+}
+
+.secondary {
+  border: 1px solid var(--g-line-2);
+  background: transparent;
+  color: var(--g-text-2);
+}
+
+.secondary:hover {
+  background: var(--g-wash);
+}
+
+/* Progress -------------------------------------------------------------- */
+.progress {
+  height: 6px;
+  margin-bottom: 8px;
+  border-radius: var(--g-radius-pill, 999px);
+  background: var(--g-track, rgba(240, 243, 247, 0.11));
+  overflow: hidden;
+}
+
+#bar {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--g-action);
+  transition: width 240ms ease;
+}
+
+#bar.failed {
+  background: var(--g-danger-text);
+}
+
+/* Waiting on a person, not on work — an indeterminate stripe rather than a
+   percentage that would be a lie. */
+#bar.waiting {
+  width: 100% !important;
+  background: repeating-linear-gradient(
+    115deg,
+    var(--g-action-dim) 0 10px,
+    var(--g-action-line) 10px 20px
+  );
+  animation: drift 900ms linear infinite;
+}
+
+@keyframes drift {
+  to {
+    background-position: 40px 0;
+  }
+}
+
+#pct {
+  margin: 0 0 14px;
+  color: var(--g-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Log ------------------------------------------------------------------ */
+#log {
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--g-line);
+  border-radius: var(--g-radius-control);
+  background: var(--g-sunken);
+  font-family: var(--g-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--g-muted);
+  word-break: break-word;
+}
+
+#log .err {
+  color: var(--g-danger-text);
+}
+
+#log .ok {
+  color: var(--g-live-text);
+  font-weight: 600;
+}
+
+/* Footer --------------------------------------------------------------- */
+footer {
+  margin-top: 40px;
+  padding-top: 18px;
+  border-top: 1px solid var(--g-line);
+}
+
+footer a {
+  color: var(--g-action-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+footer a:hover {
+  color: var(--g-action-hover);
+  text-decoration: underline;
+}
+
+.trust {
+  margin: 6px 0 0;
+  color: var(--g-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}

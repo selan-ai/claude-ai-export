@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Claude AI Export \u2014 chats, projects & tasks",
+  "version": "0.1.0",
+  "description": "Export claude.ai chats, projects, attachments and scheduled tasks to a local zip. Runs in your browser; nothing is uploaded.",
+  "permissions": [
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*"
+  ],
+  "action": {
+    "default_title": "Claude AI Export"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { rm } from 'node:fs/promises'
+import { cp, mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 /**
@@ -21,9 +21,13 @@ const entries = [
   { in: 'src/entry/page.ts', out: 'page' },
 ]
 
-for (const entry of entries) {
-  await rm(path.join(outdir, `${entry.out}.js`), { force: true })
-}
+// extension/ is entirely generated. Wiping it before every build is what makes
+// that true rather than aspirational: nothing can survive there by accident,
+// and an edit made in the wrong place is noticed immediately instead of
+// quietly outliving the source it came from.
+await rm(outdir, { recursive: true, force: true })
+await mkdir(outdir, { recursive: true })
+await cp(path.join(root, 'src/static'), outdir, { recursive: true })
 
 await build({
   entryPoints: entries.map((e) => ({ in: path.join(root, e.in), out: e.out })),
@@ -39,4 +43,4 @@ await build({
   banner: { js: '// Built from src/ by scripts/build.mjs — do not edit. Run `npm run verify`.' },
 })
 
-console.log(`built ${entries.length} bundles into extension/`)
+console.log(`built ${entries.length} bundles and copied static assets into extension/`)

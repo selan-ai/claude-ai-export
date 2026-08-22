@@ -52,8 +52,8 @@ minified, and reproducible:
 npm ci && npm run verify
 ```
 
-That rebuilds `extension/*.js` from `src/` and fails if a single byte differs
-from what is committed. So "the published code is the code that runs" stays
+That rebuilds everything in `extension/` from `src/` and fails if a single byte
+differs from what is committed. So "the published code is the code that runs" stays
 checkable rather than being something you take on faith.
 
 ## Install

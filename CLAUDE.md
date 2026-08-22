@@ -21,8 +21,15 @@ src/export/ExportSession.ts one run, start to finish
 src/entry/collector.ts      injected into the claude.ai page
 src/entry/background.ts     service worker; owns a run
 src/entry/page.ts           the UI, a view over worker state
-extension/                  manifest, HTML, CSS, and built bundles
+src/static/                 manifest.json, export.html, export.css — authored
+extension/                  ENTIRELY GENERATED. Never edit. Wiped every build.
 ```
+
+`src/` is the source. `extension/` is what Chrome loads, and every file in it
+is produced by `npm run build` — the bundles by esbuild, the static assets by a
+copy. It is committed anyway, for two reasons: "Load unpacked" has to work
+straight from a clone, and `npm run verify` needs something to compare a fresh
+build against.
 
 `npm run check` = typecheck, lint, tests, and a reproducibility check.
 
@@ -33,9 +40,10 @@ this before handing it their conversations. Every dependency added is one they
 must audit too. The zip writer is hand-rolled for exactly this reason. Dev
 dependencies are fine.
 
-**Bundles are committed and must match source.** `npm run verify` rebuilds and
-compares hashes. Never hand-edit `extension/*.js`. Never minify — readable
-output is the point.
+**extension/ is committed and must match source.** `npm run verify` rebuilds
+and compares hashes of every file, static assets included. Never edit anything
+in `extension/` — the build wipes the directory first, so the edit will vanish.
+Never minify: readable output is the point of publishing it at all.
 
 **Never read, log or store a cookie.** `credentials: 'include'` asks the browser
 to attach the session; this code never sees it. There is no code path that may
