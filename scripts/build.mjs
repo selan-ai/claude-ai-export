@@ -27,7 +27,12 @@ const entries = [
 // quietly outliving the source it came from.
 await rm(outdir, { recursive: true, force: true })
 await mkdir(outdir, { recursive: true })
-await cp(path.join(root, 'src/static'), outdir, { recursive: true })
+await cp(path.join(root, 'src/static'), outdir, {
+  recursive: true,
+  // The SVG is the design source for the PNGs; shipping it would put a file in
+  // the extension that nothing loads.
+  filter: (source) => !source.endsWith('.svg'),
+})
 
 await build({
   entryPoints: entries.map((e) => ({ in: path.join(root, e.in), out: e.out })),

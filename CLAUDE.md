@@ -22,6 +22,9 @@ src/entry/collector.ts      injected into the claude.ai page
 src/entry/background.ts     service worker; owns a run
 src/entry/page.ts           the UI, a view over worker state
 src/static/                 manifest.json, export.html, export.css — authored
+src/static/icons/           icon.svg is the design source; the PNGs are built
+                            from it by `python3 scripts/icons.py` (needs Pillow)
+                            and committed. The SVG is not shipped.
 extension/                  ENTIRELY GENERATED. Never edit. Wiped every build.
 ```
 

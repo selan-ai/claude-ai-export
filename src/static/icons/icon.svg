@@ -1,0 +1,13 @@
+<!-- Source for the toolbar icons. Regenerate the PNGs with scripts/icons.mjs.
+     Graphite's tile pattern: --g-tile (#8b6cff) with --g-on-tile (#ffffff).
+     An arrow leaving a tray — the universal export mark, and the only kind of
+     shape that still reads at 16px in a toolbar. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-labelledby="title">
+  <title id="title">Claude AI Export</title>
+  <rect width="128" height="128" rx="28" fill="#8b6cff"/>
+  <g fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 28 V74"/>
+    <path d="M45 56 L64 76 L83 56"/>
+    <path d="M36 86 V99 H92 V86"/>
+  </g>
+</svg>
