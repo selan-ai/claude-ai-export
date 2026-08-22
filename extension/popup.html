@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        width: 340px;
+        margin: 0;
+        padding: 14px;
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #1a1a1a;
+        background: #fff;
+      }
+      h1 { font-size: 14px; margin: 0 0 2px; }
+      .sub { color: #666; margin: 0 0 12px; }
+      button {
+        width: 100%;
+        padding: 9px;
+        font-size: 13px;
+        font-weight: 600;
+        border: 0;
+        border-radius: 6px;
+        background: #c96442;
+        color: #fff;
+        cursor: pointer;
+      }
+      button:disabled { background: #ccc; cursor: default; }
+      #log {
+        margin-top: 12px;
+        max-height: 210px;
+        overflow-y: auto;
+        font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #444;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #log .err { color: #b3261e; }
+      #log .ok { color: #1b6b3a; }
+      @media (prefers-color-scheme: dark) {
+        body { background: #1f1f1f; color: #eee; }
+        .sub { color: #999; }
+        #log { color: #bbb; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Claude AI Export</h1>
+    <p class="sub">Chats, projects, attachments and scheduled tasks — saved to a zip on this computer.</p>
+    <button id="go">Export my data</button>
+    <div id="log"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>
