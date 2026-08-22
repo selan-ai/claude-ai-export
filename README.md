@@ -106,6 +106,12 @@ See [docs/FORMAT.md](docs/FORMAT.md) — the exact schema Claude Desktop's
 importer parses, and the four details that silently lose data if you get them
 wrong.
 
+## Releasing
+
+Tag `v*` and a GitLab pipeline runs the full check, builds the zip, and offers
+a manual `publish` job that uploads it to the Chrome Web Store. See
+[docs/PUBLISHING.md](docs/PUBLISHING.md).
+
 ## Compatibility
 
 Verified against:
