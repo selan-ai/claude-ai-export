@@ -22,9 +22,11 @@ src/entry/collector.ts      injected into the claude.ai page
 src/entry/background.ts     service worker; owns a run
 src/entry/page.ts           the UI, a view over worker state
 src/static/                 manifest.json, export.html, export.css — authored
-src/static/icons/           icon.svg is the design source; the PNGs are built
-                            from it by `python3 scripts/icons.py` (needs Pillow)
-                            and committed. The SVG is not shipped.
+src/static/icons/           brand-1024.png is vendored verbatim from
+                            selan-website/public/brand/logo-square-1024.png.
+                            `python3 scripts/icons.py` (needs Pillow) renders
+                            the toolbar sizes from it. The source PNG is not
+                            shipped; the rendered ones are committed.
 extension/                  ENTIRELY GENERATED. Never edit. Wiped every build.
 ```
 
@@ -127,6 +129,19 @@ Kept because each cost a debugging round trip and would be re-discovered.
 4. **`Number('')` is `0`** — and `0` is a real range meaning *everything*. An
    empty selection would have exported someone's whole history. Caught by a
    test, which is why `parseExportRange` rejects empty before coercing.
+
+## The icon
+
+It is the Selan mark, not a variant of it. Do not redraw it, and do not add an
+export glyph to it — the brand set in `selan-website/public/brand/` is the
+source of truth, and this repo vendors one file from it.
+
+Two adjustments are applied by `scripts/icons.py`, and both follow decisions the
+brand set already made for small sizes: the mark is enlarged to the proportion
+`brand/favicon.svg` uses instead of `brand/icon-violet.svg` ("at 16px the mark
+needs the room", per its own note), and the square is rounded to the tile
+radius. If the brand mark changes, replace `brand-1024.png` and re-run the
+script.
 
 ## Verifying against a real Desktop
 

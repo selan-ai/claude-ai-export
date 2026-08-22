@@ -29,9 +29,9 @@ await rm(outdir, { recursive: true, force: true })
 await mkdir(outdir, { recursive: true })
 await cp(path.join(root, 'src/static'), outdir, {
   recursive: true,
-  // The SVG is the design source for the PNGs; shipping it would put a file in
-  // the extension that nothing loads.
-  filter: (source) => !source.endsWith('.svg'),
+  // brand-1024.png is the design source the toolbar PNGs are rendered from;
+  // shipping it would put a file in the extension that nothing loads.
+  filter: (source) => !source.endsWith('brand-1024.png'),
 })
 
 await build({
