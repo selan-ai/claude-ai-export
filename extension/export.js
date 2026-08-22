@@ -165,12 +165,25 @@
   report(`using org: ${chosen?.name ?? '(unknown name)'} ${ORG}`);
   const api = `/api/organizations/${ORG}`;
 
-  const index = [];
+  const all = [];
   for (let off = 0; ; off += 50) {
     const page = await req(`${api}/chat_conversations?limit=50&offset=${off}`);
-    index.push(...page);
-    report(`listed ${index.length} conversations`);
+    all.push(...page);
+    report(`listed ${all.length} conversations`);
     if (page.length < 50) break;
+  }
+
+  // Optional date window, set by the popup. Filtered on last activity, so an
+  // old chat you replied to yesterday still comes along.
+  const days = Number(globalThis.__CLAUDE_EXPORT_DAYS) || 0;
+  let index = all;
+  if (days > 0) {
+    const cutoff = Date.now() - days * 86400000;
+    index = all.filter((c) => {
+      const t = Date.parse(c.updated_at ?? c.created_at ?? '');
+      return Number.isNaN(t) ? true : t >= cutoff;
+    });
+    report(`last ${days} days: ${index.length} of ${all.length} conversations`);
   }
 
   report(`fetching ${index.length} trees (concurrency ${CONCURRENCY})`);
@@ -355,6 +368,7 @@
     docs: projects.reduce((n, p) => n + p.docs.length, 0),
     assets: assets.filter(Boolean).length,
     schedules: Array.isArray(schedules) ? schedules.length : 'see schedules.json',
+    rangeDays: days || 'all',
     skipped: skipped.length,
     blockTypes,
     zipBytes: blob.size,

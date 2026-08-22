@@ -2,52 +2,57 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <style>
-      body {
-        width: 340px;
-        margin: 0;
-        padding: 14px;
-        font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        color: #1a1a1a;
-        background: #fff;
-      }
-      h1 { font-size: 14px; margin: 0 0 2px; }
-      .sub { color: #666; margin: 0 0 12px; }
-      button {
-        width: 100%;
-        padding: 9px;
-        font-size: 13px;
-        font-weight: 600;
-        border: 0;
-        border-radius: 6px;
-        background: #c96442;
-        color: #fff;
-        cursor: pointer;
-      }
-      button:disabled { background: #ccc; cursor: default; }
-      #log {
-        margin-top: 12px;
-        max-height: 210px;
-        overflow-y: auto;
-        font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-        color: #444;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-      #log .err { color: #b3261e; }
-      #log .ok { color: #1b6b3a; }
-      @media (prefers-color-scheme: dark) {
-        body { background: #1f1f1f; color: #eee; }
-        .sub { color: #999; }
-        #log { color: #bbb; }
-      }
-    </style>
+    <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <h1>Claude AI Export</h1>
-    <p class="sub">Chats, projects, attachments and scheduled tasks — saved to a zip on this computer.</p>
-    <button id="go">Export my data</button>
-    <div id="log"></div>
+    <!-- Intro: explain what is about to happen before anything happens. -->
+    <section id="intro">
+      <header>
+        <h1>Claude AI Export</h1>
+        <p class="lede">Take your Claude data with you.</p>
+      </header>
+
+      <ol class="steps">
+        <li>We open <strong>claude.ai</strong> in a tab</li>
+        <li>We read your chats, projects and files</li>
+        <li>You get a <strong>.zip</strong> in your Downloads</li>
+      </ol>
+
+      <p class="assure">
+        Everything happens in this browser. Your data is never sent to us or
+        anyone else — there is nowhere for it to go.
+      </p>
+
+      <fieldset class="range">
+        <legend>How far back?</legend>
+        <label><input type="radio" name="range" value="30" /><span>Last 30 days</span></label>
+        <label><input type="radio" name="range" value="90" /><span>Last 90 days</span></label>
+        <label><input type="radio" name="range" value="0" checked /><span>Everything<em>recommended for moving</em></span></label>
+      </fieldset>
+
+      <button id="go" class="primary">Start export</button>
+    </section>
+
+    <!-- Running / done -->
+    <section id="running" hidden>
+      <header>
+        <h1 id="status">Exporting…</h1>
+        <p class="lede" id="statusNote">You can close this window — it keeps going.</p>
+      </header>
+      <div id="log" role="log" aria-live="polite"></div>
+      <button id="again" class="secondary" hidden>Done</button>
+    </section>
+
+    <footer>
+      <a id="src" href="https://github.com/" target="_blank" rel="noopener noreferrer">
+        Open source — read every line
+      </a>
+      <p class="trust">
+        No trackers, no accounts, no build step. The code published on GitHub is
+        exactly the code running here, and it may only talk to claude.ai.
+      </p>
+    </footer>
+
     <script src="popup.js"></script>
   </body>
 </html>

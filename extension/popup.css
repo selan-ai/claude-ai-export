@@ -1,0 +1,180 @@
+/* Selan design tokens — mirrored from selan-website/public/tokens.css */
+:root {
+  --purple-100: #e6d9fa;
+  --purple-300: #b394e9;
+  --purple-400: #9670db;
+  --purple-600: #6733be;
+  --purple-700: #53279e;
+  --purple-800: #401c7e;
+  --purple-900: #2c1259;
+  --purple-950: #1d0a3e;
+  --cyan-400: #4fc9f0;
+  --neutral-0: #fff;
+  --neutral-50: #f7f4fd;
+  --neutral-100: #eeeaf8;
+  --neutral-200: #ddd6ee;
+  --neutral-400: #9c93be;
+  --neutral-600: #5c5378;
+  --neutral-900: #221b3c;
+
+  --bg-canvas: var(--neutral-50);
+  --bg-surface: var(--neutral-0);
+  --bg-subtle: var(--neutral-100);
+  --text-primary: var(--neutral-900);
+  --text-secondary: var(--neutral-600);
+  --text-muted: var(--neutral-400);
+  --border: var(--neutral-200);
+  --brand: var(--purple-600);
+  --brand-hover: var(--purple-700);
+  --brand-subtle: var(--purple-100);
+  --on-brand: var(--neutral-0);
+  --focus-ring: var(--cyan-400);
+  --error-text: #5c1220;
+  --success-text: #0b4a38;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-canvas: var(--purple-950);
+    --bg-surface: var(--purple-900);
+    --bg-subtle: var(--purple-800);
+    --text-primary: #f1ebfb;
+    --text-secondary: var(--purple-300);
+    --text-muted: var(--purple-300);
+    --border: #3e2f66;
+    --brand: var(--purple-400);
+    --brand-hover: var(--purple-300);
+    --brand-subtle: var(--purple-800);
+    --on-brand: var(--purple-950);
+    --error-text: #f8a3b2;
+    --success-text: #7fe8c6;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 340px;
+  margin: 0;
+  padding: 18px 18px 14px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-canvas);
+}
+
+h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.lede { margin: 2px 0 14px; color: var(--text-secondary); }
+
+.steps {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  counter-reset: s;
+}
+.steps li {
+  counter-increment: s;
+  position: relative;
+  padding: 3px 0 3px 26px;
+  color: var(--text-secondary);
+}
+.steps li::before {
+  content: counter(s);
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--brand-subtle);
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 17px;
+}
+.steps strong { color: var(--text-primary); font-weight: 600; }
+
+.assure {
+  margin: 0 0 14px;
+  padding: 9px 11px;
+  border-left: 2px solid var(--brand);
+  border-radius: 0 5px 5px 0;
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.range { margin: 0 0 14px; padding: 0; border: 0; }
+.range legend {
+  padding: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.range label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.range label:hover { background: var(--bg-subtle); }
+.range input { accent-color: var(--brand); margin: 0; }
+.range em {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.primary { background: var(--brand); color: var(--on-brand); }
+.primary:hover { background: var(--brand-hover); }
+.primary:disabled { background: var(--text-muted); cursor: default; }
+.secondary {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+#log {
+  max-height: 190px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+#log .err { color: var(--error-text); }
+#log .ok { color: var(--success-text); font-weight: 600; }
+
+footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+footer a {
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 12px;
+  text-decoration: none;
+}
+footer a:hover { text-decoration: underline; }
+.trust { margin: 5px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
