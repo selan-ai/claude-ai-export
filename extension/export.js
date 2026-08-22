@@ -9,13 +9,16 @@
  * without this code ever seeing their value.
  */
 (async () => {
-  const report = (text) => {
+  // The popup may be closed; background.js is always listening. Failures here
+  // must never stop the collecting.
+  const send = (m) => {
     try {
-      chrome.runtime.sendMessage({ type: 'export-progress', text });
+      chrome.runtime.sendMessage(m);
     } catch {
-      /* popup closed — keep going */
+      /* receiver gone — keep going */
     }
   };
+  const report = (text, done, total) => send({ type: 'export-progress', text, done, total });
   const CONCURRENCY = 4;
   const GAP_MS = 150;
   // Set this to a specific org uuid to skip auto-detection.
@@ -186,7 +189,7 @@
     report(`last ${days} days: ${index.length} of ${all.length} conversations`);
   }
 
-  report(`fetching ${index.length} trees (concurrency ${CONCURRENCY})`);
+  report(`reading ${index.length} chats`, 0, index.length);
   let done = 0;
   const trees = await pooled(index, async (c) => {
     // rendering_mode=raw is what the web app uses for PUT/mutations; it returns
@@ -196,7 +199,8 @@
       `${api}/chat_conversations/${c.uuid}?tree=True&rendering_mode=messages&render_all_tools=true`,
       null,
     );
-    if (++done % 25 === 0) report(`${done}/${index.length}`);
+    done += 1;
+    report(`reading chats ${done}/${index.length}`, done, index.length);
     if (!full) {
       skipped.push({ kind: 'conversation', uuid: c.uuid, name: c.name, reason: 'tree fetch failed' });
       return null;
@@ -373,8 +377,14 @@
     blockTypes,
     zipBytes: blob.size,
   };
-  report(JSON.stringify(summary));
+  send({ type: 'export-done', summary });
   if (skipped.length) report(`skipped ${skipped.length} item(s)`);
   if (blob.size > 1024 ** 3) report('WARNING: over the 1 GiB import limit — split required');
   return summary;
-})();
+})().catch((e) => {
+  try {
+    chrome.runtime.sendMessage({ type: 'export-error', error: String(e?.message ?? e) });
+  } catch {
+    /* nothing listening */
+  }
+});

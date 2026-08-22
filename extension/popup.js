@@ -1,86 +1,80 @@
-// Popup: opens claude.ai if needed, injects export.js there, shows progress.
-// The work happens in the page because that is the only place the session lives.
+// The popup is a view, not the worker. background.js owns the job, so closing
+// this window (or Chrome closing it for us) does not stop the export.
 
 const REPO = 'https://github.com/selan-ai/claude-ai-export';
 
 const $ = (id) => document.getElementById(id);
-document.getElementById('src').href = REPO;
+$('src').href = REPO;
 
 function line(text, cls) {
+  if (!text) return;
+  const log = $('log');
+  const last = log.lastElementChild;
+  if (last && last.textContent === text) return; // reopened popup replays state
   const d = document.createElement('div');
   if (cls) d.className = cls;
   d.textContent = text;
-  $('log').appendChild(d);
-  $('log').scrollTop = $('log').scrollHeight;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
 }
 
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === 'export-progress') line(msg.text);
-});
-
-/** Reuse an open claude.ai tab, or open one and wait for it to finish loading. */
-async function claudeTab() {
-  const [existing] = await chrome.tabs.query({ url: 'https://claude.ai/*' });
-  if (existing) {
-    await chrome.tabs.update(existing.id, { active: true });
-    return existing.id;
-  }
-  line('Opening claude.ai…');
-  const tab = await chrome.tabs.create({ url: 'https://claude.ai/', active: true });
-  await new Promise((resolve) => {
-    const done = (id, info) => {
-      if (id === tab.id && info.status === 'complete') {
-        chrome.tabs.onUpdated.removeListener(done);
-        resolve();
-      }
-    };
-    chrome.tabs.onUpdated.addListener(done);
-  });
-  return tab.id;
-}
-
-$('go').addEventListener('click', async () => {
-  const days = Number(document.querySelector('input[name=range]:checked').value);
-
+function showRunning() {
   $('intro').hidden = true;
   $('running').hidden = false;
+}
 
-  try {
-    const tabId = await claudeTab();
+function progress(done, total) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  $('bar').style.width = `${pct}%`;
+  $('pct').textContent = total > 0 ? `${done} of ${total} chats · ${pct}%` : 'Preparing…';
+}
 
-    // executeScript(files:) takes no arguments, but both injections share the
-    // same isolated world, so a global set here is visible to export.js.
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: (d) => {
-        globalThis.__CLAUDE_EXPORT_DAYS = d;
-      },
-      args: [days],
-    });
-
-    const [{ result }] = await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ['export.js'],
-    });
-
-    if (!result || result.error) {
-      $('status').textContent = 'Could not finish';
-      $('statusNote').textContent = 'Nothing was saved.';
-      line(result?.error ?? 'The export stopped unexpectedly.', 'err');
-    } else {
-      $('status').textContent = 'Export complete';
-      $('statusNote').textContent = 'Saved to your Downloads folder.';
-      line('', null);
-      line(`${result.conversations} chats · ${result.projects} projects · ${result.assets} files`, 'ok');
-      line(`claude-export.zip (${(result.zipBytes / 1024 / 1024).toFixed(1)} MB)`, 'ok');
-      if (result.skipped) line(`${result.skipped} item(s) could not be fetched — listed in skipped.json`);
-    }
-  } catch (e) {
+function finish(state) {
+  if (state.phase === 'done' && state.summary) {
+    const s = state.summary;
+    $('status').textContent = 'Export complete';
+    $('statusNote').textContent = 'Saved to your Downloads folder.';
+    $('bar').style.width = '100%';
+    $('pct').textContent = `claude-export.zip · ${(s.zipBytes / 1024 / 1024).toFixed(1)} MB`;
+    line(`${s.conversations} chats · ${s.projects} projects · ${s.assets} files`, 'ok');
+    if (s.skipped) line(`${s.skipped} item(s) could not be fetched — listed in skipped.json`);
+    $('again').hidden = false;
+  } else if (state.phase === 'error') {
     $('status').textContent = 'Could not finish';
     $('statusNote').textContent = 'Nothing was saved.';
-    line(e.message, 'err');
+    $('bar').classList.add('failed');
+    $('pct').textContent = '';
+    line(state.error ?? 'The export stopped unexpectedly.', 'err');
+    $('again').hidden = false;
   }
+}
 
-  $('again').hidden = false;
-  $('again').addEventListener('click', () => window.close());
+// Live updates while the popup happens to be open.
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg?.type === 'export-progress') {
+    showRunning();
+    line(msg.text);
+    if (typeof msg.done === 'number') progress(msg.done, msg.total ?? 0);
+  }
+  if (msg?.type === 'export-done' || msg?.type === 'export-error') {
+    chrome.runtime.sendMessage({ type: 'getState' }, finish);
+  }
 });
+
+// Reopening mid-run should show the run, not the start screen.
+chrome.runtime.sendMessage({ type: 'getState' }, (state) => {
+  if (!state || state.phase === 'idle') return;
+  showRunning();
+  progress(state.done, state.total);
+  line(state.text);
+  finish(state);
+});
+
+$('go').addEventListener('click', () => {
+  const days = Number(document.querySelector('input[name=range]:checked').value);
+  showRunning();
+  progress(0, 0);
+  chrome.runtime.sendMessage({ type: 'start', days });
+});
+
+$('again').addEventListener('click', () => window.close());
