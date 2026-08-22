@@ -55,6 +55,29 @@ async function start(days) {
   }
 }
 
+// No default_popup in the manifest, so the icon click lands here.
+//
+// The obvious way to find an already-open page is tabs.query({url}), but the
+// url filter needs the "tabs" permission for anything the host permissions do
+// not already cover — including our own extension pages. That permission is
+// not worth widening the manifest for, so remember the tab instead and fall
+// back to opening a new one if the id is stale or this worker restarted.
+let pageTabId = null;
+
+chrome.action.onClicked.addListener(async () => {
+  if (pageTabId !== null) {
+    const tab = await chrome.tabs.get(pageTabId).catch(() => null);
+    if (tab) {
+      await chrome.tabs.update(tab.id, { active: true });
+      await chrome.windows.update(tab.windowId, { focused: true });
+      return;
+    }
+    pageTabId = null;
+  }
+  const tab = await chrome.tabs.create({ url: chrome.runtime.getURL('export.html') });
+  pageTabId = tab.id;
+});
+
 chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
   if (msg?.type === 'start') {
     start(msg.days);

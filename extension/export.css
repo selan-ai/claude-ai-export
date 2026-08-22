@@ -40,15 +40,58 @@
 /* 13px on a 1.4 line box, per base.css. Anything sized at a .5 states its own
    line-height; everything here stays on whole even pixels. */
 body {
-  width: 360px;
   margin: 0;
-  padding: 18px;
+  padding: 48px 24px 64px;
   font-family: var(--g-sans);
   font-size: 13px;
   line-height: 1.4;
   color: var(--g-text);
   background: var(--g-ink);
   -webkit-font-smoothing: antialiased;
+}
+
+main {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.top {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--g-line);
+}
+
+h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#next {
+  margin: 24px 0 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--g-line);
+  border-radius: var(--g-radius-card);
+  background: var(--g-panel);
+}
+
+.steps.compact li {
+  padding: 2px 0 2px 28px;
+  font-size: 12px;
+}
+
+.note {
+  margin: 12px 0 0;
+  color: var(--g-dim);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 a:focus-visible,
@@ -61,19 +104,20 @@ input:focus-visible,
 
 h1 {
   margin: 0;
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .lede {
-  margin: 4px 0 16px;
+  margin: 6px 0 0;
+  font-size: 14px;
   color: var(--g-muted);
 }
 
 /* Steps ---------------------------------------------------------------- */
 .steps {
-  margin: 0 0 14px;
+  margin: 0 0 22px;
   padding: 0;
   list-style: none;
   counter-reset: s;
@@ -82,8 +126,8 @@ h1 {
 .steps li {
   counter-increment: s;
   position: relative;
-  min-height: 20px;
-  padding: 4px 0 4px 28px;
+  min-height: 22px;
+  padding: 7px 0 7px 32px;
   color: var(--g-text-2);
 }
 
@@ -110,7 +154,7 @@ h1 {
 
 /* Assurance ------------------------------------------------------------ */
 .assure {
-  margin: 0 0 16px;
+  margin: 0 0 26px;
   padding: 10px 12px;
   border: 1px solid var(--g-line);
   border-radius: var(--g-radius-control);
@@ -122,7 +166,7 @@ h1 {
 
 /* Range ---------------------------------------------------------------- */
 .range {
-  margin: 0 0 16px;
+  margin: 0 0 26px;
   padding: 0;
   border: 0;
 }
@@ -172,8 +216,9 @@ h1 {
 
 /* Buttons -------------------------------------------------------------- */
 button {
-  width: 100%;
-  height: 38px;
+  min-width: 180px;
+  height: 40px;
+  padding: 0 20px;
   border: 0;
   border-radius: var(--g-radius-control);
   font-family: inherit;
@@ -237,7 +282,7 @@ button {
 
 /* Log ------------------------------------------------------------------ */
 #log {
-  max-height: 200px;
+  max-height: 260px;
   overflow-y: auto;
   margin-bottom: 14px;
   padding: 10px 12px;
@@ -262,8 +307,8 @@ button {
 
 /* Footer --------------------------------------------------------------- */
 footer {
-  margin-top: 16px;
-  padding-top: 14px;
+  margin-top: 40px;
+  padding-top: 18px;
   border-top: 1px solid var(--g-line);
 }
 

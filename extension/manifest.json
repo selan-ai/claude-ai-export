@@ -10,8 +10,7 @@
     "https://claude.ai/*"
   ],
   "action": {
-    "default_title": "Claude AI Export",
-    "default_popup": "popup.html"
+    "default_title": "Claude AI Export"
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"

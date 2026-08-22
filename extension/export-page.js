@@ -1,5 +1,5 @@
-// The popup is a view, not the worker. background.js owns the job, so closing
-// this window (or Chrome closing it for us) does not stop the export.
+// This page is a view, not the worker. background.js owns the job, so closing
+// the tab does not stop an export that is already running.
 
 const REPO = 'https://github.com/selan-ai/claude-ai-export';
 
@@ -38,6 +38,7 @@ function finish(state) {
     $('pct').textContent = `claude-export.zip · ${(s.zipBytes / 1024 / 1024).toFixed(1)} MB`;
     line(`${s.conversations} chats · ${s.projects} projects · ${s.assets} files`, 'ok');
     if (s.skipped) line(`${s.skipped} item(s) could not be fetched — listed in skipped.json`);
+    $('next').hidden = false;
     $('again').hidden = false;
   } else if (state.phase === 'error') {
     $('status').textContent = 'Could not finish';
@@ -77,4 +78,13 @@ $('go').addEventListener('click', () => {
   chrome.runtime.sendMessage({ type: 'start', days });
 });
 
-$('again').addEventListener('click', () => window.close());
+// The page persists, so "again" returns to the start screen rather than closing.
+$('again').addEventListener('click', () => {
+  $('log').textContent = '';
+  $('next').hidden = true;
+  $('again').hidden = true;
+  $('bar').classList.remove('failed');
+  $('bar').style.width = '0%';
+  $('running').hidden = true;
+  $('intro').hidden = false;
+});
