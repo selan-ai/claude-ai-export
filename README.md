@@ -108,9 +108,9 @@ wrong.
 
 ## Releasing
 
-Tag `v*` and a GitLab pipeline runs the full check, builds the zip, and offers
-a manual `publish` job that uploads it to the Chrome Web Store. See
-[docs/PUBLISHING.md](docs/PUBLISHING.md).
+Releases are tagged here and published to the Chrome Web Store from a separate,
+private pipeline that clones the tag, re-runs `npm run check` against it, and
+refuses to ship if the committed bundles do not match the committed source.
 
 ## Compatibility
 
