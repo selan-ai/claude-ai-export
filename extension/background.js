@@ -1,157 +1,213 @@
-// The export takes minutes; a popup does not survive that. Chrome tears the
-// popup down the moment focus moves — which is exactly what opening a tab does.
-// So the popup only starts and observes: this worker owns the job, and the
-// collecting itself runs in the page and finishes even if this worker naps.
-
-let pageTabId = null;
-
-const state = {
-  phase: 'idle', // idle | running | login | done | error
-  text: '',
-  pct: 0,
-  summary: null,
-  error: null,
-};
-
-/** Reuse an open claude.ai tab, else open one in the background. */
-async function claudeTab() {
-  const [existing] = await chrome.tabs.query({ url: 'https://claude.ai/*' });
-  if (existing) return existing.id;
-
-  // active:false on purpose: focusing a new tab closes the popup, and the user
-  // asked to watch the progress rather than be thrown at claude.ai.
-  const tab = await chrome.tabs.create({ url: 'https://claude.ai/', active: false });
-  await new Promise((resolve) => {
-    const onDone = (id, info) => {
-      if (id === tab.id && info.status === 'complete') {
-        chrome.tabs.onUpdated.removeListener(onDone);
-        resolve();
-      }
-    };
-    chrome.tabs.onUpdated.addListener(onDone);
-  });
-  return tab.id;
-}
-
-/**
- * Is there a usable claude.ai session in that tab? Runs in the page so the
- * cookie applies. A logged-out visitor still gets a 200 from some endpoints,
- * so require an account with at least one organization.
- */
-async function signedIn(tabId) {
-  const [res] = await chrome.scripting
-    .executeScript({
-      target: { tabId },
-      func: async () => {
-        try {
-          const r = await fetch('/api/bootstrap', { credentials: 'include', cache: 'no-store' });
-          if (!r.ok) return false;
-          const b = await r.json();
-          return Boolean(b?.account?.memberships?.length);
-        } catch {
-          return false;
-        }
-      },
-    })
-    .catch(() => [{ result: false }]);
-  return res?.result === true;
-}
-
-/**
- * Wait for the person to sign in, then carry on by itself. Polling every few
- * seconds also keeps this worker from being shut down mid-wait.
- */
-async function waitForLogin(tabId) {
-  await chrome.tabs.update(tabId, { active: true });
-  const deadline = Date.now() + 10 * 60_000;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 2500));
-    if (state.phase !== 'login') return false; // cancelled
-    if (await signedIn(tabId)) return true;
+// Built from src/ by scripts/build.mjs — do not edit. Run `npm run verify`.
+"use strict";
+(() => {
+  // src/domain.ts
+  var ExportRange = {
+    lastThirtyDays: 30,
+    lastNinetyDays: 90,
+    everything: 0
+  };
+  var exportRangeValues = Object.values(ExportRange);
+  var ExportPhase = {
+    idle: "idle",
+    awaitingSignIn: "awaitingSignIn",
+    running: "running",
+    done: "done",
+    failed: "failed"
+  };
+  var idleState = {
+    phase: ExportPhase.idle,
+    label: "",
+    percent: 0,
+    summary: null,
+    error: null
+  };
+  var MessageKind = {
+    start: "start",
+    requestState: "requestState",
+    progress: "progress",
+    awaitingSignIn: "awaitingSignIn",
+    finished: "finished",
+    failed: "failed"
+  };
+  function parseExportMessage(value) {
+    if (typeof value !== "object" || value === null) return null;
+    const kind = value.kind;
+    if (typeof kind !== "string" || !(kind in MessageKind)) return null;
+    return value;
   }
-  return false;
-}
+  var maxInFlightPercent = 98;
 
-async function start(days) {
-  Object.assign(state, { phase: 'running', text: 'Starting…', pct: 0, summary: null, error: null });
-  try {
-    const tabId = await claudeTab();
-
-    if (!(await signedIn(tabId))) {
-      Object.assign(state, { phase: 'login', text: 'Waiting for sign-in' });
-      try {
-        chrome.runtime.sendMessage({ type: 'awaiting-login' });
-      } catch {
-        /* page not open */
-      }
-      if (!(await waitForLogin(tabId))) {
-        if (state.phase === 'login')
-          Object.assign(state, { phase: 'error', error: 'Timed out waiting for sign-in to claude.ai.' });
-        return;
-      }
-      Object.assign(state, { phase: 'running', text: 'Signed in — starting…' });
-      if (pageTabId !== null) await chrome.tabs.update(pageTabId, { active: true }).catch(() => {});
-    }
-    // executeScript(files:) passes no arguments, but both injections share one
-    // isolated world, so a global set here is visible to export.js.
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: (d) => {
-        globalThis.__CLAUDE_EXPORT_DAYS = d;
-      },
-      args: [days],
-    });
-    // Deliberately not awaited: the page keeps collecting regardless of this
-    // worker's lifetime, and progress arrives by message.
-    chrome.scripting
-      .executeScript({ target: { tabId }, files: ['export.js'] })
-      .catch((e) => Object.assign(state, { phase: 'error', error: e.message }));
-  } catch (e) {
-    Object.assign(state, { phase: 'error', error: e.message });
-  }
-}
-
-// No default_popup in the manifest, so the icon click lands here.
-//
-// The obvious way to find an already-open page is tabs.query({url}), but the
-// url filter needs the "tabs" permission for anything the host permissions do
-// not already cover — including our own extension pages. That permission is
-// not worth widening the manifest for, so remember the tab instead and fall
-// back to opening a new one if the id is stale or this worker restarted.
-chrome.action.onClicked.addListener(async () => {
-  if (pageTabId !== null) {
-    const tab = await chrome.tabs.get(pageTabId).catch(() => null);
-    if (tab) {
-      await chrome.tabs.update(tab.id, { active: true });
-      await chrome.windows.update(tab.windowId, { focused: true });
-      return;
-    }
+  // src/entry/background.ts
+  var ExportCoordinator = class {
+    state = idleState;
     pageTabId = null;
-  }
-  const tab = await chrome.tabs.create({ url: chrome.runtime.getURL('export.html') });
-  pageTabId = tab.id;
-});
-
-chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
-  if (msg?.type === 'start') {
-    start(msg.days);
-    respond({ ok: true });
-    return true;
-  }
-  if (msg?.type === 'getState') {
-    respond(state);
-    return true;
-  }
-  if (msg?.type === 'export-progress') {
-    state.text = msg.text ?? state.text;
-    // Clamp below 100: only a finished, downloaded export earns a full bar.
-    if (typeof msg.pct === 'number') state.pct = Math.min(98, Math.round(msg.pct));
-  }
-  if (msg?.type === 'export-done') {
-    Object.assign(state, { phase: 'done', summary: msg.summary, pct: 100 });
-  }
-  if (msg?.type === 'export-error') {
-    Object.assign(state, { phase: 'error', error: msg.error });
-  }
-  return false;
-});
+    get currentState() {
+      return this.state;
+    }
+    /** Opens the export page, or focuses the one already open. */
+    async openPage() {
+      if (this.pageTabId !== null) {
+        const existing = await chrome.tabs.get(this.pageTabId).catch(() => null);
+        if (existing?.id !== void 0) {
+          await chrome.tabs.update(existing.id, { active: true });
+          if (existing.windowId !== void 0) {
+            await chrome.windows.update(existing.windowId, { focused: true });
+          }
+          return;
+        }
+        this.pageTabId = null;
+      }
+      const created = await chrome.tabs.create({ url: chrome.runtime.getURL("export.html") });
+      this.pageTabId = created.id ?? null;
+    }
+    async start(rangeDays) {
+      this.state = {
+        phase: ExportPhase.running,
+        label: "Starting…",
+        percent: 0,
+        summary: null,
+        error: null
+      };
+      try {
+        const tabId = await this.claudeTab();
+        if (!await this.hasSession(tabId)) {
+          this.state = {
+            ...this.state,
+            phase: ExportPhase.awaitingSignIn,
+            label: "Waiting for sign-in"
+          };
+          this.notify({ kind: MessageKind.awaitingSignIn });
+          if (!await this.waitForSignIn(tabId)) {
+            if (this.state.phase === ExportPhase.awaitingSignIn) {
+              this.fail("Timed out waiting for sign-in to claude.ai.");
+            }
+            return;
+          }
+          this.state = { ...this.state, phase: ExportPhase.running, label: "Signed in — starting…" };
+          if (this.pageTabId !== null) {
+            await chrome.tabs.update(this.pageTabId, { active: true }).catch(() => null);
+          }
+        }
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          func: (days) => {
+            globalThis.__claudeExportRangeDays = days;
+          },
+          args: [String(rangeDays)]
+        });
+        void chrome.scripting.executeScript({ target: { tabId }, files: ["collector.js"] }).catch(
+          (error) => this.fail(error instanceof Error ? error.message : String(error))
+        );
+      } catch (error) {
+        this.fail(error instanceof Error ? error.message : String(error));
+      }
+    }
+    apply(message) {
+      if (message === null) return;
+      switch (message.kind) {
+        case MessageKind.progress:
+          this.state = {
+            ...this.state,
+            label: message.label,
+            // Clamped regardless of what the page claims: only a saved file is 100.
+            percent: Math.min(maxInFlightPercent, Math.round(message.percent))
+          };
+          break;
+        case MessageKind.finished:
+          this.state = {
+            phase: ExportPhase.done,
+            label: "Export complete",
+            percent: 100,
+            summary: message.summary,
+            error: null
+          };
+          break;
+        case MessageKind.failed:
+          this.fail(message.error);
+          break;
+        default:
+          break;
+      }
+    }
+    /** Reuses an open claude.ai tab, else opens one without stealing focus. */
+    async claudeTab() {
+      const [existing] = await chrome.tabs.query({ url: "https://claude.ai/*" });
+      if (existing?.id !== void 0) return existing.id;
+      const created = await chrome.tabs.create({ url: "https://claude.ai/", active: false });
+      const tabId = created.id;
+      if (tabId === void 0) throw new Error("Could not open claude.ai.");
+      await new Promise((resolve) => {
+        const onUpdated = (id, info) => {
+          if (id === tabId && info.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(onUpdated);
+            resolve();
+          }
+        };
+        chrome.tabs.onUpdated.addListener(onUpdated);
+      });
+      return tabId;
+    }
+    /**
+     * A signed-out visitor still gets 200 from some endpoints, so a usable
+     * session means an account with at least one organization — not merely a
+     * response.
+     */
+    async hasSession(tabId) {
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: async () => {
+          try {
+            const response = await fetch("/api/bootstrap", {
+              credentials: "include",
+              cache: "no-store"
+            });
+            if (!response.ok) return false;
+            const body = await response.json();
+            return (body.account?.memberships?.length ?? 0) > 0;
+          } catch {
+            return false;
+          }
+        }
+      }).catch(() => [{ result: false }]);
+      return result?.result === true;
+    }
+    /** Polling doubles as a keepalive, so the worker is not shut down mid-wait. */
+    async waitForSignIn(tabId) {
+      await chrome.tabs.update(tabId, { active: true });
+      const deadline = Date.now() + 10 * 6e4;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        if (this.state.phase !== ExportPhase.awaitingSignIn) return false;
+        if (await this.hasSession(tabId)) return true;
+      }
+      return false;
+    }
+    fail(error) {
+      this.state = { ...this.state, phase: ExportPhase.failed, error };
+    }
+    notify(message) {
+      try {
+        chrome.runtime.sendMessage(message);
+      } catch {
+      }
+    }
+  };
+  var coordinator = new ExportCoordinator();
+  chrome.action.onClicked.addListener(() => void coordinator.openPage());
+  chrome.runtime.onMessage.addListener((raw, _sender, respond) => {
+    const message = parseExportMessage(raw);
+    if (message === null) return false;
+    if (message.kind === MessageKind.start) {
+      void coordinator.start(message.rangeDays);
+      respond({ accepted: true });
+      return true;
+    }
+    if (message.kind === MessageKind.requestState) {
+      respond(coordinator.currentState);
+      return true;
+    }
+    coordinator.apply(message);
+    return false;
+  });
+})();

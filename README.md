@@ -42,8 +42,19 @@ You do not have to take that on trust. Read `extension/manifest.json`:
 remote config, and the CSP forbids loading remote code. Those three lines are
 checkable in thirty seconds, without reading any logic.
 
-It also has **no dependencies** and **no build step**. What is in this repo is
-byte-for-byte what runs in your browser — nothing is bundled or minified.
+It also has **no runtime dependencies** — not even a zip library; that is
+hand-rolled so there is nothing extra to audit.
+
+The source is TypeScript, so there is a build. The output is committed, never
+minified, and reproducible:
+
+```bash
+npm ci && npm run verify
+```
+
+That rebuilds `extension/*.js` from `src/` and fails if a single byte differs
+from what is committed. So "the published code is the code that runs" stays
+checkable rather than being something you take on faith.
 
 ## Install
 
@@ -51,11 +62,25 @@ Not on the Chrome Web Store yet. Load it directly:
 
 1. `chrome://extensions` → enable **Developer mode**
 2. **Load unpacked** → select the `extension/` folder
-3. Open [claude.ai](https://claude.ai), log in
-4. Click the extension → **Export my data**
+3. Click the extension icon — it opens claude.ai for you if it needs to, and
+   waits if you are not signed in
+4. Choose a date range → **Start export**
 
 A few minutes later `claude-export.zip` lands in Downloads. Around 25 MB for
 ~350 conversations.
+
+## Development
+
+```bash
+npm ci
+npm run check     # typecheck, lint, tests, reproducible-build check
+npm run build     # rebuild extension/*.js from src/
+```
+
+TypeScript 7, Biome, and Node's built-in test runner. No test framework, no
+bundler config beyond one esbuild call. See [CLAUDE.md](CLAUDE.md) for the
+reverse-engineered facts about both APIs and the rules that are not style
+preferences.
 
 Works in Chrome, Edge, Brave and Arc. Firefox needs a small manifest change;
 Safari needs an Xcode wrapper.

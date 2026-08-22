@@ -1,0 +1,26 @@
+{
+  "name": "claude-ai-export",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Export claude.ai chats, projects, attachments and scheduled tasks to a local zip.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "verify": "node scripts/verify.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src test scripts",
+    "format": "biome check --write src test scripts",
+    "test": "node --test --experimental-strip-types --import ./scripts/alias.mjs test/*.test.ts",
+    "check": "npm run typecheck && npm run lint && npm test && npm run verify"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.10",
+    "@types/chrome": "^0.1.31",
+    "@types/node": "^26.2.0",
+    "esbuild": "^0.25.0",
+    "typescript": "7.0.2"
+  }
+}
