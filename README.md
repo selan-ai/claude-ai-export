@@ -10,6 +10,8 @@ for anyone who wants a local copy of their own conversations.
 
 ---
 
+**[Step-by-step guide with screenshots →](docs/IMPORT_EXPORT.md)**
+
 ## 1. Export
 
 **Chrome Web Store** — pending review. Until it clears, load it directly:
@@ -169,7 +171,10 @@ something to compare a fresh build against.
 [CLAUDE.md](CLAUDE.md) has the reverse-engineered facts about both APIs — the
 ones where getting it wrong loses data silently — and the rules that are not
 style preferences. Read it before changing anything.
+
 [docs/FORMAT.md](docs/FORMAT.md) is the archive schema.
+[docs/IMPORT_EXPORT.md](docs/IMPORT_EXPORT.md) is the walkthrough with
+screenshots.
 
 ## Releasing
 
