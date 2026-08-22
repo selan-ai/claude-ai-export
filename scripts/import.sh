@@ -172,7 +172,7 @@ if [ -x "$DESKTOP" ]; then
   Your chats appear in the sidebar and projects become Spaces. Scheduled tasks
   are already in place — look under Scheduled.
 
-  If there is no "Import & export" in Settings, Desktop is signed in to
+  If there is no "Import & export" item in Settings, Desktop is signed in to
   claude.ai rather than a third-party gateway; that menu only exists in the
   latter.
 

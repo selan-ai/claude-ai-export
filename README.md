@@ -41,7 +41,7 @@ Claude Desktop has a built-in importer when your organisation has it storing
 conversations locally. It is the supported path and this project does not
 replace it.
 
-**Settings → General → Import → `Import…`**
+**Settings → Import & export → `Import…`**
 
 The wizard has three steps:
 
