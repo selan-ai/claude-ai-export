@@ -42,6 +42,7 @@ function interpolate(from: number, to: number, done: number, total: number): num
 export class ExportSession {
   private readonly mapper = new ExportMapper()
   private readonly skipped: SkippedItem[] = []
+  private available = 0
 
   constructor(private readonly options: ExportOptions) {}
 
@@ -92,6 +93,7 @@ export class ExportSession {
       this.options.progress.report(`Listing conversations — ${total} so far`, ProgressStop.listing),
     )
 
+    this.available = headers.length
     const selected = this.withinRange(headers)
     const noun = selected.length === 1 ? 'chat' : 'chats'
     this.options.progress.report(`Reading ${selected.length} ${noun}`, ProgressStop.chatsStart)
@@ -214,6 +216,7 @@ export class ExportSession {
 
     return {
       conversations: conversations.length,
+      conversationsAvailable: this.available,
       messages: conversations.reduce((sum, c) => sum + c.chat_messages.length, 0),
       projects: projects.length,
       documents: projects.reduce((sum, p) => sum + p.docs.length, 0),

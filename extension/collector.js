@@ -396,6 +396,7 @@ ${body}
     }
     mapper = new ExportMapper();
     skipped = [];
+    available = 0;
     async run() {
       const api = new ClaudeApi(await this.resolveOrganization());
       const conversations = await this.collectConversations(api);
@@ -434,6 +435,7 @@ ${body}
       const headers = await api.listConversations(
         (total) => this.options.progress.report(`Listing conversations — ${total} so far`, ProgressStop.listing)
       );
+      this.available = headers.length;
       const selected = this.withinRange(headers);
       const noun = selected.length === 1 ? "chat" : "chats";
       this.options.progress.report(`Reading ${selected.length} ${noun}`, ProgressStop.chatsStart);
@@ -523,6 +525,7 @@ ${body}
       const tasks = Array.isArray(scheduledTasks) ? scheduledTasks.length : Array.isArray(scheduledTasks?.data) ? scheduledTasks.data.length : 0;
       return {
         conversations: conversations.length,
+        conversationsAvailable: this.available,
         messages: conversations.reduce((sum, c) => sum + c.chat_messages.length, 0),
         projects: projects.length,
         documents: projects.reduce((sum, p) => sum + p.docs.length, 0),

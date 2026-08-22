@@ -137,6 +137,12 @@
         `${summary.conversations} chats · ${summary.projects} projects · ${summary.assets} files`,
         "ok"
       );
+      const held = summary.conversationsAvailable;
+      if (summary.rangeDays !== 0 && held > summary.conversations) {
+        this.append(
+          `Only ${summary.conversations} of your ${held} chats fall in the last ${summary.rangeDays} days. Export again with "Everything" to include the rest.`
+        );
+      }
       if (summary.skipped > 0) {
         this.append(`${summary.skipped} item(s) could not be fetched — listed in skipped.json`);
       }

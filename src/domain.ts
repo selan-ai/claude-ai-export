@@ -47,6 +47,12 @@ export type ExportPhase = (typeof ExportPhase)[keyof typeof ExportPhase]
 /** What the run produced. Counts only — never conversation content. */
 export interface ExportSummary {
   readonly conversations: number
+  /**
+   * How many conversations the account has in total, before the date window.
+   * Carried so the page can say "1 of 366" — a short range on an old account
+   * produces an export that looks fine and is nearly empty.
+   */
+  readonly conversationsAvailable: number
   readonly messages: number
   readonly projects: number
   readonly documents: number

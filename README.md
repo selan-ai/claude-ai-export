@@ -97,8 +97,21 @@ Notes:
 - Re-running the import **does not create duplicates**, but it also **does not
   update chats already imported** — existing sessions are skipped, not
   refreshed.
-- Scheduled tasks are not carried by the zip. `schedules.json` inside it has
-  everything needed to recreate them; see [docs/SCHEDULES.md](docs/SCHEDULES.md).
+### Scheduled tasks
+
+The importer reads five things out of the archive — `conversations.json`,
+`projects.json`, `users.json`, `manifest.json` and `files/` — and nothing else.
+There is no field for a schedule in that schema, and Desktop's own tasks are
+local files rather than server data, so they need a separate step:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/selan-ai/claude-ai-export/main/scripts/import-schedules.sh | bash
+```
+
+It finds the newest export in Downloads by itself, converts each cron from UTC
+to your local time (claude.ai stores them in UTC; Desktop runs them locally),
+writes the tasks, and backs up what it replaced. Only `bash`, `jq`, `unzip` and
+`date` — all stock on macOS 15+, nothing to install.
 
 ## Zip format
 
