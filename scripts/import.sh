@@ -1,8 +1,19 @@
 #!/bin/bash
 #
-# Recreates your claude.ai scheduled tasks in Claude Desktop.
+# Imports a claude.ai export into Claude Desktop.
 #
-#   bash import-schedules.sh [path/to/claude-export.zip]
+#   bash import.sh [path/to/claude-export.zip]
+#
+# Two halves, because they work differently:
+#
+#   Chats, projects and attachments go through Desktop's own importer, which is
+#   Anthropic's supported path. This script cannot run it for you — it opens
+#   Desktop with the archive already selected so it is one click, not a hunt
+#   through Downloads.
+#
+#   Scheduled tasks cannot go that way at all. The importer reads five members
+#   out of the archive and none of them is a schedule, and Desktop's own tasks
+#   are local files rather than server data. Those this script writes directly.
 #
 # With no argument it finds the newest claude-export*.zip in Downloads, Desktop
 # or the current directory — exporting twice gives you "claude-export (1).zip",
@@ -41,7 +52,7 @@ else
   ARCHIVE=$(find "$HOME/Downloads" "$HOME/Desktop" "$PWD" -maxdepth 1 -name 'claude-export*.zip' -print0 2>/dev/null \
     | xargs -0 ls -t 2>/dev/null | head -1)
   [ -n "$ARCHIVE" ] || die "no claude-export*.zip found in Downloads, Desktop or here.
-       Export from claude.ai first, or pass the path:  bash import-schedules.sh /path/to/export.zip"
+       Export from claude.ai first, or pass the path:  bash import.sh /path/to/export.zip"
   printf '\nUsing %s (%s)\n' "$ARCHIVE" "$(date -r "$ARCHIVE" '+%d %b %H:%M')"
 fi
 
@@ -137,8 +148,35 @@ for index in $(seq 0 $((COUNT - 1))); do
   added=$((added + 1))
 done
 
-printf '\n%s task(s) written.\n' "$added"
+printf '\n%s scheduled task(s) written.\n' "$added"
 note "store:   $STORE"
 note "prompts: $TASK_FILES"
-printf '\nOpen Claude Desktop and look under Scheduled in the sidebar.\n'
-printf 'To undo: cp "%s.bak" "%s"\n\n' "$STORE" "$STORE"
+printf '  undo:    cp "%s.bak" "%s"\n' "$STORE" "$STORE"
+
+# Now the other half. CLAUDE_E2E_IMPORT_ZIP pre-selects the archive, so the
+# wizard opens no file dialog. Desktop still requires a person to confirm the
+# import, and that is left alone deliberately.
+DESKTOP=/Applications/Claude.app/Contents/MacOS/Claude
+if [ -x "$DESKTOP" ]; then
+  printf '\nOpening Claude Desktop with the export loaded…\n'
+  CLAUDE_E2E_IMPORT_ZIP="$ARCHIVE" "$DESKTOP" >/dev/null 2>&1 &
+  sleep 2
+  cat <<'NEXT'
+
+  In Claude Desktop:
+
+    Settings → Import & export → Import… → Choose file…
+
+  The archive should already be selected. Then Review → Import.
+
+  Your chats appear in the sidebar and projects become Spaces. Scheduled tasks
+  are already in place — look under Scheduled.
+
+  If there is no "Import & export" in Settings, Desktop is signed in to
+  claude.ai rather than a third-party gateway; that menu only exists in the
+  latter.
+
+NEXT
+else
+  warn "Claude Desktop not found at $DESKTOP — import the archive by hand"
+fi
