@@ -3,11 +3,12 @@
 // So the popup only starts and observes: this worker owns the job, and the
 // collecting itself runs in the page and finishes even if this worker naps.
 
+let pageTabId = null;
+
 const state = {
-  phase: 'idle', // idle | running | done | error
+  phase: 'idle', // idle | running | login | done | error
   text: '',
-  done: 0,
-  total: 0,
+  pct: 0,
   summary: null,
   error: null,
 };
@@ -32,10 +33,65 @@ async function claudeTab() {
   return tab.id;
 }
 
+/**
+ * Is there a usable claude.ai session in that tab? Runs in the page so the
+ * cookie applies. A logged-out visitor still gets a 200 from some endpoints,
+ * so require an account with at least one organization.
+ */
+async function signedIn(tabId) {
+  const [res] = await chrome.scripting
+    .executeScript({
+      target: { tabId },
+      func: async () => {
+        try {
+          const r = await fetch('/api/bootstrap', { credentials: 'include', cache: 'no-store' });
+          if (!r.ok) return false;
+          const b = await r.json();
+          return Boolean(b?.account?.memberships?.length);
+        } catch {
+          return false;
+        }
+      },
+    })
+    .catch(() => [{ result: false }]);
+  return res?.result === true;
+}
+
+/**
+ * Wait for the person to sign in, then carry on by itself. Polling every few
+ * seconds also keeps this worker from being shut down mid-wait.
+ */
+async function waitForLogin(tabId) {
+  await chrome.tabs.update(tabId, { active: true });
+  const deadline = Date.now() + 10 * 60_000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2500));
+    if (state.phase !== 'login') return false; // cancelled
+    if (await signedIn(tabId)) return true;
+  }
+  return false;
+}
+
 async function start(days) {
-  Object.assign(state, { phase: 'running', text: 'Starting…', done: 0, total: 0, summary: null, error: null });
+  Object.assign(state, { phase: 'running', text: 'Starting…', pct: 0, summary: null, error: null });
   try {
     const tabId = await claudeTab();
+
+    if (!(await signedIn(tabId))) {
+      Object.assign(state, { phase: 'login', text: 'Waiting for sign-in' });
+      try {
+        chrome.runtime.sendMessage({ type: 'awaiting-login' });
+      } catch {
+        /* page not open */
+      }
+      if (!(await waitForLogin(tabId))) {
+        if (state.phase === 'login')
+          Object.assign(state, { phase: 'error', error: 'Timed out waiting for sign-in to claude.ai.' });
+        return;
+      }
+      Object.assign(state, { phase: 'running', text: 'Signed in — starting…' });
+      if (pageTabId !== null) await chrome.tabs.update(pageTabId, { active: true }).catch(() => {});
+    }
     // executeScript(files:) passes no arguments, but both injections share one
     // isolated world, so a global set here is visible to export.js.
     await chrome.scripting.executeScript({
@@ -62,8 +118,6 @@ async function start(days) {
 // not already cover — including our own extension pages. That permission is
 // not worth widening the manifest for, so remember the tab instead and fall
 // back to opening a new one if the id is stale or this worker restarted.
-let pageTabId = null;
-
 chrome.action.onClicked.addListener(async () => {
   if (pageTabId !== null) {
     const tab = await chrome.tabs.get(pageTabId).catch(() => null);
@@ -90,11 +144,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
   }
   if (msg?.type === 'export-progress') {
     state.text = msg.text ?? state.text;
-    if (typeof msg.done === 'number') state.done = msg.done;
-    if (typeof msg.total === 'number') state.total = msg.total;
+    // Clamp below 100: only a finished, downloaded export earns a full bar.
+    if (typeof msg.pct === 'number') state.pct = Math.min(98, Math.round(msg.pct));
   }
   if (msg?.type === 'export-done') {
-    Object.assign(state, { phase: 'done', summary: msg.summary, done: state.total });
+    Object.assign(state, { phase: 'done', summary: msg.summary, pct: 100 });
   }
   if (msg?.type === 'export-error') {
     Object.assign(state, { phase: 'error', error: msg.error });

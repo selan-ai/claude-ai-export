@@ -18,7 +18,10 @@
       /* receiver gone — keep going */
     }
   };
-  const report = (text, done, total) => send({ type: 'export-progress', text, done, total });
+  // pct is the share of the whole job, not of one stage — chats are most of
+  // the wall-clock but downloading files and building the zip are not free, so
+  // the bar must not sit at 100% through them. Only export-done reaches 100.
+  const report = (text, pct) => send({ type: 'export-progress', text, pct });
   const CONCURRENCY = 4;
   const GAP_MS = 150;
   // Set this to a specific org uuid to skip auto-detection.
@@ -172,7 +175,7 @@
   for (let off = 0; ; off += 50) {
     const page = await req(`${api}/chat_conversations?limit=50&offset=${off}`);
     all.push(...page);
-    report(`listed ${all.length} conversations`);
+    report(`Listing conversations — ${all.length} so far`, 2);
     if (page.length < 50) break;
   }
 
@@ -189,7 +192,7 @@
     report(`last ${days} days: ${index.length} of ${all.length} conversations`);
   }
 
-  report(`reading ${index.length} chats`, 0, index.length);
+  report(`Reading ${index.length} ${index.length === 1 ? 'chat' : 'chats'}`, 5);
   let done = 0;
   const trees = await pooled(index, async (c) => {
     // rendering_mode=raw is what the web app uses for PUT/mutations; it returns
@@ -200,7 +203,7 @@
       null,
     );
     done += 1;
-    report(`reading chats ${done}/${index.length}`, done, index.length);
+    report(`Reading chats — ${done} of ${index.length}`, 5 + (done / Math.max(1, index.length)) * 65);
     if (!full) {
       skipped.push({ kind: 'conversation', uuid: c.uuid, name: c.name, reason: 'tree fetch failed' });
       return null;
@@ -209,7 +212,7 @@
   });
   const conversations = trees.filter(Boolean).map(normConversation);
 
-  report('projects');
+  report('Reading projects', 72);
   const projectIndex = await req(`${api}/projects`);
   const projects = await pooled(projectIndex, async (p) => {
     const [detail, docs, files] = await Promise.all([
@@ -247,7 +250,7 @@
     }
   }
 
-  report('scheduled tasks');
+  report('Reading scheduled tasks', 76);
   const schedulesRaw = await soft(`${api}/cowork/scheduled_tasks`, null);
   const schedules = schedulesRaw ?? { unavailable: true };
 
@@ -257,8 +260,11 @@
     for (const m of c.chat_messages) for (const f of m.files) wanted.set(f.file_uuid, f.file_name);
   for (const p of projects) for (const f of p.files) wanted.set(f.file_uuid, f.file_name);
 
-  report(`downloading ${wanted.size} binary assets`);
+  report(`Downloading ${wanted.size} file${wanted.size === 1 ? '' : 's'}`, 78);
+  let fetched = 0;
   const assets = await pooled([...wanted.keys()], async (uuid) => {
+    fetched += 1;
+    report(`Downloading files — ${fetched} of ${wanted.size}`, 78 + (fetched / Math.max(1, wanted.size)) * 17);
     // /contents serves any file type; /preview and /thumbnail only render
     // images and PDFs, so they 404 on things like .pptx and .zip.
     for (const url of [
@@ -356,7 +362,9 @@
     ...assets.filter(Boolean).map((a) => ({ name: `files/${a.uuid}`, data: a.data })),
   ];
 
+  report('Building the zip', 96);
   const blob = buildZip(entries);
+  report('Saving to Downloads', 98);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

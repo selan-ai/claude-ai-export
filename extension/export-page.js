@@ -23,10 +23,21 @@ function showRunning() {
   $('running').hidden = false;
 }
 
-function progress(done, total) {
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  $('bar').style.width = `${pct}%`;
-  $('pct').textContent = total > 0 ? `${done} of ${total} chats · ${pct}%` : 'Preparing…';
+function progress(pct, text) {
+  $('bar').style.width = `${pct ?? 0}%`;
+  $('pct').textContent = text ? `${text} · ${pct ?? 0}%` : 'Preparing…';
+}
+
+function showLogin() {
+  showRunning();
+  $('status').textContent = 'Sign in to claude.ai';
+  $('statusNote').textContent =
+    'We opened claude.ai in another tab. Sign in there and the export starts by itself — you do not need to come back here.';
+  $('bar').classList.add('waiting');
+}
+
+function clearLogin() {
+  $('bar').classList.remove('waiting');
 }
 
 function finish(state) {
@@ -34,6 +45,7 @@ function finish(state) {
     const s = state.summary;
     $('status').textContent = 'Export complete';
     $('statusNote').textContent = 'Saved to your Downloads folder.';
+    clearLogin();
     $('bar').style.width = '100%';
     $('pct').textContent = `claude-export.zip · ${(s.zipBytes / 1024 / 1024).toFixed(1)} MB`;
     line(`${s.conversations} chats · ${s.projects} projects · ${s.assets} files`, 'ok');
@@ -54,19 +66,24 @@ function finish(state) {
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === 'export-progress') {
     showRunning();
+    clearLogin();
+    $('status').textContent = 'Exporting…';
+    $('statusNote').textContent = 'Leave this tab open. It is safe to keep working elsewhere.';
     line(msg.text);
-    if (typeof msg.done === 'number') progress(msg.done, msg.total ?? 0);
+    if (typeof msg.pct === 'number') progress(Math.min(98, Math.round(msg.pct)), msg.text);
   }
   if (msg?.type === 'export-done' || msg?.type === 'export-error') {
     chrome.runtime.sendMessage({ type: 'getState' }, finish);
   }
+  if (msg?.type === 'awaiting-login') showLogin();
 });
 
 // Reopening mid-run should show the run, not the start screen.
 chrome.runtime.sendMessage({ type: 'getState' }, (state) => {
   if (!state || state.phase === 'idle') return;
+  if (state.phase === 'login') return showLogin();
   showRunning();
-  progress(state.done, state.total);
+  progress(state.pct, state.text);
   line(state.text);
   finish(state);
 });
@@ -74,7 +91,7 @@ chrome.runtime.sendMessage({ type: 'getState' }, (state) => {
 $('go').addEventListener('click', () => {
   const days = Number(document.querySelector('input[name=range]:checked').value);
   showRunning();
-  progress(0, 0);
+  progress(0, '');
   chrome.runtime.sendMessage({ type: 'start', days });
 });
 

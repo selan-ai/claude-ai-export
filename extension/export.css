@@ -273,6 +273,24 @@ button {
   background: var(--g-danger-text);
 }
 
+/* Waiting on a person, not on work — an indeterminate stripe rather than a
+   percentage that would be a lie. */
+#bar.waiting {
+  width: 100% !important;
+  background: repeating-linear-gradient(
+    115deg,
+    var(--g-action-dim) 0 10px,
+    var(--g-action-line) 10px 20px
+  );
+  animation: drift 900ms linear infinite;
+}
+
+@keyframes drift {
+  to {
+    background-position: 40px 0;
+  }
+}
+
 #pct {
   margin: 0 0 14px;
   color: var(--g-dim);
