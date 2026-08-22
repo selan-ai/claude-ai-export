@@ -123,6 +123,7 @@
       this.intro.hidden = true;
       this.running.hidden = false;
       this.bar.classList.add("waiting");
+      this.bar.style.width = "100%";
       this.status.textContent = "Sign in to claude.ai";
       this.statusNote.textContent = "We opened claude.ai in another tab. Sign in there and the export starts by itself.";
     }

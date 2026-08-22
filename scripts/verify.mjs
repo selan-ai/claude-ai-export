@@ -26,9 +26,13 @@ const digest = async (file) =>
     .update(await readFile(path.join(root, 'extension', file)))
     .digest('hex')
 
-const before = Object.fromEntries(await Promise.all(artefacts.map(async (b) => [b, await digest(b)])))
+const before = Object.fromEntries(
+  await Promise.all(artefacts.map(async (b) => [b, await digest(b)])),
+)
 execFileSync('node', [path.join(root, 'scripts/build.mjs')], { stdio: 'inherit' })
-const after = Object.fromEntries(await Promise.all(artefacts.map(async (b) => [b, await digest(b)])))
+const after = Object.fromEntries(
+  await Promise.all(artefacts.map(async (b) => [b, await digest(b)])),
+)
 
 const drifted = artefacts.filter((b) => before[b] !== after[b])
 for (const bundle of artefacts) {

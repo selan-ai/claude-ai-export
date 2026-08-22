@@ -26,7 +26,8 @@
   --g-radius-card: 12px;
   --g-radius-control: 8px;
   --g-radius-tile: 6px;
-  --g-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --g-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --g-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
   color-scheme: dark;
 }
@@ -80,11 +81,6 @@ h3 {
   border: 1px solid var(--g-line);
   border-radius: var(--g-radius-card);
   background: var(--g-panel);
-}
-
-.steps.compact li {
-  padding: 2px 0 2px 28px;
-  font-size: 12px;
 }
 
 .note {
@@ -150,6 +146,10 @@ h1 {
 .steps strong {
   color: var(--g-text);
   font-weight: 600;
+}
+.steps.compact li {
+  padding: 2px 0 2px 28px;
+  font-size: 12px;
 }
 
 /* Assurance ------------------------------------------------------------ */
@@ -276,7 +276,6 @@ button {
 /* Waiting on a person, not on work — an indeterminate stripe rather than a
    percentage that would be a lie. */
 #bar.waiting {
-  width: 100% !important;
   background: repeating-linear-gradient(
     115deg,
     var(--g-action-dim) 0 10px,
