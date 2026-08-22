@@ -29,9 +29,7 @@ await rm(outdir, { recursive: true, force: true })
 await mkdir(outdir, { recursive: true })
 await cp(path.join(root, 'src/static'), outdir, {
   recursive: true,
-  // brand-1024.png is the design source the toolbar PNGs are rendered from;
-  // shipping it would put a file in the extension that nothing loads.
-  filter: (source) => !source.endsWith('brand-1024.png'),
+  filter: () => true,
 })
 
 await build({
