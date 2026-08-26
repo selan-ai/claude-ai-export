@@ -1,5 +1,19 @@
-import { type ExportMessage, MessageKind, maxInFlightPercent, parseExportRange } from '@/domain'
-import { type ArchiveSink, ExportSession, type ProgressSink } from '@/export/ExportSession'
+import {
+  type AccountIdentity,
+  type ExportMessage,
+  MessageKind,
+  maxInFlightPercent,
+  type OrganizationChoice,
+  parseExportMessage,
+  parseExportRange,
+} from '@/domain'
+import {
+  type AccountChooser,
+  type ArchiveSink,
+  ExportSession,
+  type ProgressSink,
+  type SourceSink,
+} from '@/export/ExportSession'
 
 /**
  * Injected into a claude.ai tab. This is the only file that runs with the
@@ -11,6 +25,9 @@ declare global {
   // one isolated world, so a global is the only channel executeScript offers.
   var __claudeExportRangeDays: string | undefined
 }
+
+/** As long as the worker waits for a sign-in. Both wait on the same person. */
+const choiceTimeoutMs = 10 * 60_000
 
 function post(message: ExportMessage): void {
   try {
@@ -30,6 +47,54 @@ class MessageProgress implements ProgressSink {
   }
 }
 
+class MessageSource implements SourceSink {
+  announce(identity: AccountIdentity, organization: OrganizationChoice): void {
+    post({ kind: MessageKind.source, identity, organization })
+  }
+}
+
+/**
+ * Puts the question on the export page and waits for an answer.
+ *
+ * The reply cannot come straight back: `runtime.sendMessage` from a page never
+ * reaches a content script, so the worker relays it with `tabs.sendMessage`,
+ * which does. Bounded, because the page holding the question can be closed —
+ * and a run that waits forever is worse than one that says why it stopped.
+ */
+class MessageChooser implements AccountChooser {
+  async choose(
+    identity: AccountIdentity,
+    candidates: readonly OrganizationChoice[],
+  ): Promise<OrganizationChoice> {
+    post({ kind: MessageKind.awaitingAccountChoice, identity, candidates })
+
+    const uuid = await new Promise<string | null>((resolve) => {
+      let timer: ReturnType<typeof setTimeout>
+      const listener = (raw: unknown): void => {
+        const message = parseExportMessage(raw)
+        if (message === null || message.kind !== MessageKind.chooseAccount) return
+        clearTimeout(timer)
+        chrome.runtime.onMessage.removeListener(listener)
+        resolve(message.organizationUuid)
+      }
+      timer = setTimeout(() => {
+        chrome.runtime.onMessage.removeListener(listener)
+        resolve(null)
+      }, choiceTimeoutMs)
+      chrome.runtime.onMessage.addListener(listener)
+    })
+
+    if (uuid === null) {
+      throw new Error('No account was picked, so nothing was exported. Start again when ready.')
+    }
+    const chosen = candidates.find((candidate) => candidate.uuid === uuid)
+    if (chosen === undefined) {
+      throw new Error('That account is no longer one of the options. Start again.')
+    }
+    return chosen
+  }
+}
+
 class DownloadSink implements ArchiveSink {
   deliver(fileName: string, blob: Blob): void {
     const url = URL.createObjectURL(blob)
@@ -46,6 +111,8 @@ async function main(): Promise<void> {
     rangeDays: parseExportRange(globalThis.__claudeExportRangeDays ?? ''),
     progress: new MessageProgress(),
     archive: new DownloadSink(),
+    chooser: new MessageChooser(),
+    source: new MessageSource(),
   })
 
   try {

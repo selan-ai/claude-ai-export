@@ -13,9 +13,14 @@
     const days = Number(raw);
     return exportRangeValues.includes(days) ? days : ExportRange.lastThirtyDays;
   }
+  function describeConversationCount(organization) {
+    const noun = organization.conversationsSeen === 1 ? "chat" : "chats";
+    return `${organization.conversationsSeen}${organization.moreThanSeen ? "+" : ""} ${noun}`;
+  }
   var ExportPhase = {
     idle: "idle",
     awaitingSignIn: "awaitingSignIn",
+    choosingAccount: "choosingAccount",
     running: "running",
     done: "done",
     failed: "failed"
@@ -25,13 +30,19 @@
     label: "",
     percent: 0,
     summary: null,
-    error: null
+    error: null,
+    identity: null,
+    organization: null,
+    candidates: []
   };
   var MessageKind = {
     start: "start",
     requestState: "requestState",
     progress: "progress",
     awaitingSignIn: "awaitingSignIn",
+    awaitingAccountChoice: "awaitingAccountChoice",
+    chooseAccount: "chooseAccount",
+    source: "source",
     finished: "finished",
     failed: "failed"
   };
@@ -60,6 +71,9 @@
     log = element("log");
     nextSteps = element("next");
     restart = element("again");
+    account = element("account");
+    chooser = element("choose");
+    organizations = element("orgs");
     constructor() {
       element("src").href = sourceUrl;
       element("go").addEventListener("click", () => this.start());
@@ -86,6 +100,14 @@
         this.showAwaitingSignIn();
         return;
       }
+      if (message.kind === MessageKind.source) {
+        this.showSource(message.identity, message.organization);
+        return;
+      }
+      if (message.kind === MessageKind.awaitingAccountChoice) {
+        this.showChoice(message.identity, message.candidates);
+        return;
+      }
       if (message.kind === MessageKind.progress) {
         this.showRunning();
         this.setProgress(message.percent, message.label);
@@ -104,6 +126,13 @@
       if (state.phase === ExportPhase.awaitingSignIn) {
         this.showAwaitingSignIn();
         return;
+      }
+      if (state.phase === ExportPhase.choosingAccount && state.identity !== null) {
+        this.showChoice(state.identity, state.candidates);
+        return;
+      }
+      if (state.identity !== null && state.organization !== null) {
+        this.showSource(state.identity, state.organization);
       }
       this.showRunning();
       this.setProgress(state.percent, state.label);
@@ -126,6 +155,70 @@
       this.bar.style.width = "100%";
       this.status.textContent = "Sign in to claude.ai";
       this.statusNote.textContent = "We opened claude.ai in another tab. Sign in there and the export starts by itself.";
+    }
+    /**
+     * Names the source of the export, and keeps naming it: the line stays up
+     * through the run and the completion screen, so the zip in Downloads can
+     * always be traced back to an account someone saw.
+     */
+    showSource(identity, organization) {
+      this.account.textContent = "";
+      this.account.append(
+        this.span("who", identity.email === "" ? "Signed-in account" : identity.email),
+        this.span("dim", "→"),
+        this.span("who", organization.name),
+        this.span(`kind ${organization.kind}`, organization.kind),
+        this.span(
+          "dim",
+          [
+            organization.seatTier,
+            describeConversationCount(organization),
+            organization.uuid.slice(0, 8)
+          ].filter((part) => part !== null).join(" · ")
+        )
+      );
+      this.account.hidden = false;
+      this.chooser.hidden = true;
+    }
+    /** More than one readable account, so the run stops here until someone picks. */
+    showChoice(identity, candidates) {
+      this.intro.hidden = true;
+      this.running.hidden = false;
+      this.account.hidden = true;
+      this.bar.classList.add("waiting");
+      this.bar.style.width = "100%";
+      this.status.textContent = "Which account?";
+      this.statusNote.textContent = identity.email === "" ? "Pick the organisation to export from." : `Signed in as ${identity.email}.`;
+      this.percentLabel.textContent = "";
+      this.organizations.textContent = "";
+      for (const candidate of candidates) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.append(
+          this.span("name", candidate.name),
+          this.span(`kind ${candidate.kind}`, candidate.kind),
+          this.span(
+            "meta",
+            [candidate.seatTier, describeConversationCount(candidate), candidate.uuid.slice(0, 8)].filter((part) => part !== null).join(" · ")
+          )
+        );
+        button.addEventListener("click", () => {
+          this.chooser.hidden = true;
+          this.showRunning();
+          chrome.runtime.sendMessage({
+            kind: MessageKind.chooseAccount,
+            organizationUuid: candidate.uuid
+          });
+        });
+        this.organizations.appendChild(button);
+      }
+      this.chooser.hidden = false;
+    }
+    span(className, text) {
+      const span = document.createElement("span");
+      span.className = className;
+      span.textContent = text;
+      return span;
     }
     showComplete(summary) {
       this.bar.classList.remove("waiting");
@@ -174,6 +267,10 @@
     }
     reset() {
       this.log.textContent = "";
+      this.account.hidden = true;
+      this.account.textContent = "";
+      this.chooser.hidden = true;
+      this.organizations.textContent = "";
       this.nextSteps.hidden = true;
       this.restart.hidden = true;
       this.bar.classList.remove("failed", "waiting");

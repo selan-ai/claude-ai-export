@@ -21,6 +21,12 @@ covered.
 
 Press **Start export**. A large history takes a few minutes.
 
+**Check the account line.** Before anything is read, the page names the account
+and the organisation it is about to export — `you@work.com → Acme` with a
+**work** or **personal** badge. A work seat and a personal subscription usually
+sit on the same email address, so if more than one organisation can be read the
+page asks which one instead of choosing for you.
+
 ![Mid-export, showing the progress bar and a log of what is being read](images/export-running.png)
 
 You can close the tab. The export runs in a claude.ai tab and a background
@@ -36,11 +42,16 @@ worker, so neither closing this page nor Chrome tidying it away will stop it.
 conversations.json   every chat, with its full message tree
 projects.json        projects, their instructions and knowledge documents
 users.json           your account uuid, and nothing else about you
+export-source.json   which account and organisation this export came from
 files/<uuid>         every attachment and image, as raw bytes
 schedules.json       your scheduled tasks (see Part 3)
 skipped.json         anything that could not be fetched, and why
 blocktypes.json      which content block types your history contains
 ```
+
+`export-source.json` is worth keeping. Two archives in one Downloads folder look
+identical, and this is the only thing in either that says which account and
+organisation it was read from.
 
 `skipped.json` is worth opening if the counts look low. Losing data quietly is
 the failure this project cares most about avoiding, so anything that could not

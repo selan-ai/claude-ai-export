@@ -28,6 +28,12 @@ the tab — the export keeps running.
 `claude-export.zip` lands in your Downloads folder. Roughly 25 MB for 350
 conversations.
 
+> **It names the account before it reads anything.** A work seat and a personal
+> subscription usually sit on the same email address, so the page shows the
+> organisation it is exporting — with a **work** or **personal** badge — and asks
+> which one when more than one is readable, rather than picking the largest and
+> saying nothing. The same detail lands in `export-source.json` inside the zip.
+
 > **Choose "Everything" if you are moving accounts.** The default is the last 30
 > days, and on an account whose history is older that produces a small archive
 > which looks perfectly successful — 600 KB where the full export is 25 MB. The

@@ -11,6 +11,25 @@
 export interface ApiOrganization {
   readonly uuid: string
   readonly name: string | null
+  /**
+   * What the organization is for: `chat`, `api`, `claude_max`… One without
+   * `chat` holds no conversations and answers 403 when asked for them, so this
+   * is what keeps an API/Console organization out of the candidates.
+   */
+  readonly capabilities: readonly string[] | null
+}
+
+export interface ApiMembership {
+  readonly organization: ApiOrganization | null
+  /** `team_tier_1` on a work seat, `null` on a personal organization. */
+  readonly seat_tier: string | null
+}
+
+/** The signed-in account, and everything it belongs to. */
+export interface ApiAccount {
+  readonly email_address: string | null
+  readonly full_name: string | null
+  readonly memberships: readonly ApiMembership[] | null
 }
 
 export interface ApiConversationSummary {
@@ -93,34 +112,46 @@ export class ClaudeApi {
   constructor(private readonly organizationUuid: string) {}
 
   /**
-   * Which organization owns the data. An account can belong to several — a
-   * personal one and a work one — and some refuse to be read at all, so the
-   * caller must be able to tell "no chats" from "not allowed".
+   * Who is signed in, and which organizations they belong to.
+   *
+   * The email is read here and shown to the user, because it is the only thing
+   * that names the login an export came from. It is never sent anywhere: the
+   * caller puts it on screen and into the zip, both of which stay on the
+   * machine.
    */
-  static async listOrganizations(): Promise<readonly ApiOrganization[]> {
-    const bootstrap = await ClaudeApi.getJson<{
-      account: { memberships: readonly { organization: ApiOrganization }[] } | null
-    }>('/api/bootstrap')
-    const memberships = bootstrap.account?.memberships ?? []
-    return memberships.map((m) => m.organization).filter((o) => typeof o?.uuid === 'string')
+  static async readAccount(): Promise<ApiAccount> {
+    const bootstrap = await ClaudeApi.getJson<{ account: ApiAccount | null }>('/api/bootstrap')
+    const account = bootstrap.account
+    if (account === null || account === undefined) {
+      return { email_address: null, full_name: null, memberships: [] }
+    }
+    return account
   }
 
   /**
    * Can this organization's conversations be listed at all? Distinguishes an
    * empty organization from one this session may not read, so the caller never
    * silently exports nothing from the wrong place.
+   *
+   * `full` says the first page came back full — the organization holds at least
+   * `count`, not exactly `count`. Only a whole pagination walk knows the total,
+   * and this runs on every candidate before anything is chosen.
    */
-  static async probeOrganization(
-    uuid: string,
-  ): Promise<{ readonly readable: boolean; readonly status: number; readonly count: number }> {
+  static async probeOrganization(uuid: string): Promise<{
+    readonly readable: boolean
+    readonly status: number
+    readonly count: number
+    readonly full: boolean
+  }> {
     const path = `/api/organizations/${uuid}/chat_conversations?limit=${conversationPageSize}&offset=0`
     const response = await fetch(path, { credentials: 'include', cache: 'no-store' }).catch(
       () => null,
     )
-    if (response === null) return { readable: false, status: 0, count: 0 }
-    if (!response.ok) return { readable: false, status: response.status, count: 0 }
+    if (response === null) return { readable: false, status: 0, count: 0, full: false }
+    if (!response.ok) return { readable: false, status: response.status, count: 0, full: false }
     const body: unknown = await response.json().catch(() => null)
-    return { readable: true, status: 200, count: Array.isArray(body) ? body.length : 0 }
+    const count = Array.isArray(body) ? body.length : 0
+    return { readable: true, status: 200, count, full: count >= conversationPageSize }
   }
 
   /** Every conversation header, following pagination to the end. */

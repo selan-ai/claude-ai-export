@@ -1,7 +1,17 @@
 import { ZipArchive } from '@/archive/ZipArchive'
 import { type ApiConversationSummary, ClaudeApi } from '@/claude/ClaudeApi'
 import { ExportMapper, type ImportConversation, type ImportProject } from '@/claude/ExportMapper'
-import { ExportRange, type ExportSummary, ProgressStop, type SkippedItem } from '@/domain'
+import {
+  type AccountIdentity,
+  canHoldConversations,
+  classifyOrganization,
+  ExportRange,
+  type ExportSummary,
+  type OrganizationChoice,
+  OrganizationKind,
+  ProgressStop,
+  type SkippedItem,
+} from '@/domain'
 
 /** Reports where the run is. Implemented by the collector's message channel. */
 export interface ProgressSink {
@@ -13,10 +23,38 @@ export interface ArchiveSink {
   deliver(fileName: string, blob: Blob): void
 }
 
+/**
+ * Picks the organization to export from when more than one is readable. Asking
+ * a person is the collector's job; a test answers immediately.
+ */
+export interface AccountChooser {
+  choose(
+    identity: AccountIdentity,
+    candidates: readonly OrganizationChoice[],
+  ): Promise<OrganizationChoice>
+}
+
+/**
+ * Says where the export is coming from, before a single conversation is read.
+ * Arriving early is the whole point: an announcement after the fact tells
+ * someone what they already cannot change.
+ */
+export interface SourceSink {
+  announce(identity: AccountIdentity, organization: OrganizationChoice): void
+}
+
+/** The account and organization a run settled on. */
+export interface ExportSource {
+  readonly identity: AccountIdentity
+  readonly organization: OrganizationChoice
+}
+
 export interface ExportOptions {
   readonly rangeDays: ExportRange
   readonly progress: ProgressSink
   readonly archive: ArchiveSink
+  readonly chooser: AccountChooser
+  readonly source: SourceSink
 }
 
 const requestGapMs = 150
@@ -47,7 +85,9 @@ export class ExportSession {
   constructor(private readonly options: ExportOptions) {}
 
   async run(): Promise<ExportSummary> {
-    const api = new ClaudeApi(await this.resolveOrganization())
+    const source = await this.resolveSource()
+    this.options.source.announce(source.identity, source.organization)
+    const api = new ClaudeApi(source.organization.uuid)
 
     const conversations = await this.collectConversations(api)
     const projects = await this.collectProjects(api)
@@ -57,35 +97,79 @@ export class ExportSession {
 
     const assets = await this.collectAssets(api, conversations, projects)
 
-    return this.buildArchive(conversations, projects, scheduledTasks, assets)
+    return this.buildArchive(source, conversations, projects, scheduledTasks, assets)
   }
 
   /**
-   * An account can belong to several organizations, and a session is not
-   * always allowed to read all of them. Probing tells "empty" apart from
-   * "forbidden", so a 403 on one never results in silently exporting nothing.
+   * Which account, and which of its organizations.
+   *
+   * An account can belong to several, a session is not always allowed to read
+   * all of them, and — the reason this asks rather than decides — a work
+   * organization and a personal one are usually the same email address. Picking
+   * the largest was silently right most of the time and silently wrong the rest,
+   * with nothing on screen either way.
+   *
+   * Probing still happens for every candidate, because it is the only thing
+   * that tells "empty" apart from "forbidden".
    */
-  private async resolveOrganization(): Promise<string> {
-    const organizations = await ClaudeApi.listOrganizations()
-    if (organizations.length === 0) {
+  private async resolveSource(): Promise<ExportSource> {
+    this.options.progress.report('Reading your account', ProgressStop.account)
+
+    const account = await ClaudeApi.readAccount()
+    const identity: AccountIdentity = {
+      email: account.email_address ?? '',
+      fullName: account.full_name ?? null,
+    }
+
+    const memberships = (account.memberships ?? []).filter(
+      (membership) => typeof membership.organization?.uuid === 'string',
+    )
+    if (memberships.length === 0) {
       throw new Error('No organizations on this account. Are you signed in to claude.ai?')
     }
-    const only = organizations[0]
-    if (organizations.length === 1 && only !== undefined) return only.uuid
 
     const probes = await Promise.all(
-      organizations.map(async (organization) => ({
-        organization,
-        ...(await ClaudeApi.probeOrganization(organization.uuid)),
-      })),
+      memberships
+        // An organization without `chat` is an API/Console one. It answers 403,
+        // and asking would put a candidate on screen that can never be exported.
+        .filter((membership) => canHoldConversations(membership.organization?.capabilities ?? []))
+        .map(async (membership) => {
+          const organization = membership.organization
+          if (organization === null || organization === undefined) return null
+          const name = organization.name ?? 'Unnamed organization'
+          const seatTier = membership.seat_tier ?? null
+          const probe = await ClaudeApi.probeOrganization(organization.uuid)
+          if (!probe.readable || probe.count === 0) return null
+          return {
+            uuid: organization.uuid,
+            name,
+            kind: classifyOrganization(
+              { name, capabilities: organization.capabilities ?? [], seatTier },
+              identity.email,
+            ),
+            seatTier,
+            conversationsSeen: probe.count,
+            moreThanSeen: probe.full,
+          } satisfies OrganizationChoice
+        }),
     )
 
-    const usable = probes.filter((p) => p.readable && p.count > 0).sort((a, b) => b.count - a.count)
-    const best = usable[0]
-    if (best === undefined) {
+    // Work first, then the largest: whatever a person is most likely to have
+    // meant heads the list. Nothing is preselected — the point is a choice.
+    const candidates = probes
+      .filter((candidate): candidate is OrganizationChoice => candidate !== null)
+      .sort((a, b) => {
+        if (a.kind !== b.kind) return a.kind === OrganizationKind.work ? -1 : 1
+        return b.conversationsSeen - a.conversationsSeen
+      })
+
+    const only = candidates[0]
+    if (only === undefined) {
       throw new Error('None of your organizations returned any conversations.')
     }
-    return best.organization.uuid
+    if (candidates.length === 1) return { identity, organization: only }
+
+    return { identity, organization: await this.options.chooser.choose(identity, candidates) }
   }
 
   private async collectConversations(api: ClaudeApi): Promise<readonly ImportConversation[]> {
@@ -181,6 +265,7 @@ export class ExportSession {
   }
 
   private buildArchive(
+    source: ExportSource,
     conversations: readonly ImportConversation[],
     projects: readonly ImportProject[],
     scheduledTasks: unknown,
@@ -192,6 +277,22 @@ export class ExportSession {
     archive.addJson('conversations.json', conversations)
     archive.addJson('projects.json', projects)
     archive.addJson('users.json', [{ uuid: crypto.randomUUID() }])
+    // Names the account and organization this came from. Two zips in one
+    // Downloads folder are indistinguishable otherwise, and the one thing a
+    // person needs to know about an export is whose data is in it. Read by
+    // nobody but a human; the importer ignores members it does not know.
+    archive.addJson('export-source.json', {
+      account: source.identity.email,
+      full_name: source.identity.fullName,
+      organization: {
+        uuid: source.organization.uuid,
+        name: source.organization.name,
+        kind: source.organization.kind,
+        seat_tier: source.organization.seatTier,
+      },
+      range_days: this.options.rangeDays,
+      exported_at: new Date().toISOString(),
+    })
     // Read by the schedule importer, ignored by Claude Desktop's.
     archive.addJson('schedules.json', scheduledTasks ?? { unavailable: true })
     archive.addJson('skipped.json', this.skipped)
