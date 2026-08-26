@@ -19,6 +19,9 @@ import {
 class ExportCoordinator {
   private state: ExportState = idleState
   private pageTabId: number | null = null
+  /** The claude.ai tab running the collector. A content script is only
+   * reachable through its tab, so an account choice needs this to get back. */
+  private claudeTabId: number | null = null
 
   get currentState(): ExportState {
     return this.state
@@ -48,10 +51,14 @@ class ExportCoordinator {
       percent: 0,
       summary: null,
       error: null,
+      identity: null,
+      organization: null,
+      candidates: [],
     }
 
     try {
       const tabId = await this.claudeTab()
+      this.claudeTabId = tabId
 
       if (!(await this.hasSession(tabId))) {
         this.state = {
@@ -92,9 +99,47 @@ class ExportCoordinator {
     }
   }
 
+  /**
+   * Hands a chosen organization to the collector.
+   *
+   * `runtime.sendMessage` from the page reaches this worker and every extension
+   * page, but never a content script — so the last hop has to be addressed to
+   * the tab.
+   */
+  async relayChoice(organizationUuid: string): Promise<void> {
+    const tabId = this.claudeTabId
+    if (tabId === null) return
+    this.state = {
+      ...this.state,
+      phase: ExportPhase.running,
+      label: 'Starting…',
+      candidates: [],
+    }
+    await chrome.tabs
+      .sendMessage(tabId, { kind: MessageKind.chooseAccount, organizationUuid })
+      .catch(() => this.fail('The claude.ai tab closed before the export could start.'))
+  }
+
   apply(message: ReturnType<typeof parseExportMessage>): void {
     if (message === null) return
     switch (message.kind) {
+      case MessageKind.source:
+        this.state = {
+          ...this.state,
+          identity: message.identity,
+          organization: message.organization,
+          candidates: [],
+        }
+        break
+      case MessageKind.awaitingAccountChoice:
+        this.state = {
+          ...this.state,
+          phase: ExportPhase.choosingAccount,
+          label: 'Waiting for an account',
+          identity: message.identity,
+          candidates: message.candidates,
+        }
+        break
       case MessageKind.progress:
         this.state = {
           ...this.state,
@@ -105,11 +150,13 @@ class ExportCoordinator {
         break
       case MessageKind.finished:
         this.state = {
+          ...this.state,
           phase: ExportPhase.done,
           label: 'Export complete',
           percent: 100,
           summary: message.summary,
           error: null,
+          candidates: [],
         }
         break
       case MessageKind.failed:
@@ -210,6 +257,11 @@ chrome.runtime.onMessage.addListener((raw: unknown, _sender, respond) => {
   }
   if (message.kind === MessageKind.requestState) {
     respond(coordinator.currentState)
+    return true
+  }
+  if (message.kind === MessageKind.chooseAccount) {
+    void coordinator.relayChoice(message.organizationUuid)
+    respond({ accepted: true })
     return true
   }
 

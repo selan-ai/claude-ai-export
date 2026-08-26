@@ -1,8 +1,11 @@
 import {
+  type AccountIdentity,
+  describeConversationCount,
   ExportPhase,
   type ExportState,
   type ExportSummary,
   MessageKind,
+  type OrganizationChoice,
   parseExportMessage,
   parseExportRange,
 } from '@/domain'
@@ -34,6 +37,9 @@ class ExportPageView {
   private readonly log = element('log')
   private readonly nextSteps = element('next')
   private readonly restart = element<HTMLButtonElement>('again')
+  private readonly account = element('account')
+  private readonly chooser = element('choose')
+  private readonly organizations = element('orgs')
 
   constructor() {
     element<HTMLAnchorElement>('src').href = sourceUrl
@@ -65,6 +71,14 @@ class ExportPageView {
       this.showAwaitingSignIn()
       return
     }
+    if (message.kind === MessageKind.source) {
+      this.showSource(message.identity, message.organization)
+      return
+    }
+    if (message.kind === MessageKind.awaitingAccountChoice) {
+      this.showChoice(message.identity, message.candidates)
+      return
+    }
     if (message.kind === MessageKind.progress) {
       this.showRunning()
       this.setProgress(message.percent, message.label)
@@ -85,6 +99,15 @@ class ExportPageView {
     if (state.phase === ExportPhase.awaitingSignIn) {
       this.showAwaitingSignIn()
       return
+    }
+    // A reopened tab must show the question, not a bar creeping along while the
+    // run is in fact waiting on it.
+    if (state.phase === ExportPhase.choosingAccount && state.identity !== null) {
+      this.showChoice(state.identity, state.candidates)
+      return
+    }
+    if (state.identity !== null && state.organization !== null) {
+      this.showSource(state.identity, state.organization)
     }
 
     this.showRunning()
@@ -114,6 +137,81 @@ class ExportPageView {
     this.status.textContent = 'Sign in to claude.ai'
     this.statusNote.textContent =
       'We opened claude.ai in another tab. Sign in there and the export starts by itself.'
+  }
+
+  /**
+   * Names the source of the export, and keeps naming it: the line stays up
+   * through the run and the completion screen, so the zip in Downloads can
+   * always be traced back to an account someone saw.
+   */
+  private showSource(identity: AccountIdentity, organization: OrganizationChoice): void {
+    this.account.textContent = ''
+    this.account.append(
+      this.span('who', identity.email === '' ? 'Signed-in account' : identity.email),
+      this.span('dim', '→'),
+      this.span('who', organization.name),
+      this.span(`kind ${organization.kind}`, organization.kind),
+      this.span(
+        'dim',
+        [
+          organization.seatTier,
+          describeConversationCount(organization),
+          organization.uuid.slice(0, 8),
+        ]
+          .filter((part) => part !== null)
+          .join(' · '),
+      ),
+    )
+    this.account.hidden = false
+    this.chooser.hidden = true
+  }
+
+  /** More than one readable account, so the run stops here until someone picks. */
+  private showChoice(identity: AccountIdentity, candidates: readonly OrganizationChoice[]): void {
+    this.intro.hidden = true
+    this.running.hidden = false
+    this.account.hidden = true
+    this.bar.classList.add('waiting')
+    this.bar.style.width = '100%'
+    this.status.textContent = 'Which account?'
+    this.statusNote.textContent =
+      identity.email === ''
+        ? 'Pick the organisation to export from.'
+        : `Signed in as ${identity.email}.`
+    this.percentLabel.textContent = ''
+
+    this.organizations.textContent = ''
+    for (const candidate of candidates) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.append(
+        this.span('name', candidate.name),
+        this.span(`kind ${candidate.kind}`, candidate.kind),
+        this.span(
+          'meta',
+          [candidate.seatTier, describeConversationCount(candidate), candidate.uuid.slice(0, 8)]
+            .filter((part) => part !== null)
+            .join(' · '),
+        ),
+      )
+      button.addEventListener('click', () => {
+        this.chooser.hidden = true
+        this.showRunning()
+        chrome.runtime.sendMessage({
+          kind: MessageKind.chooseAccount,
+          organizationUuid: candidate.uuid,
+        })
+      })
+      this.organizations.appendChild(button)
+    }
+    this.chooser.hidden = false
+  }
+
+  private span(className: string, text: string): HTMLSpanElement {
+    const span = document.createElement('span')
+    span.className = className
+    span.textContent = text
+    return span
   }
 
   private showComplete(summary: ExportSummary): void {
@@ -171,6 +269,10 @@ class ExportPageView {
 
   private reset(): void {
     this.log.textContent = ''
+    this.account.hidden = true
+    this.account.textContent = ''
+    this.chooser.hidden = true
+    this.organizations.textContent = ''
     this.nextSteps.hidden = true
     this.restart.hidden = true
     this.bar.classList.remove('failed', 'waiting')

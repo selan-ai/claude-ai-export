@@ -49,6 +49,20 @@
         <h2 id="status">Exporting…</h2>
         <p class="lede" id="statusNote">Leave this tab open. It is safe to keep working elsewhere.</p>
 
+        <!-- Which account the data is coming from. On screen before anything is
+             read, because a work and a personal account are usually one email. -->
+        <p id="account" class="account" hidden></p>
+
+        <fieldset id="choose" class="choose" hidden>
+          <legend>Organisations you can export</legend>
+          <p class="note">
+            You are signed in to more than one. A work and a personal account
+            can share an email address, so the organisation is what tells them
+            apart. Nothing is read until you pick one.
+          </p>
+          <div id="orgs"></div>
+        </fieldset>
+
         <div class="progress" role="progressbar" aria-labelledby="pct">
           <div id="bar"></div>
         </div>

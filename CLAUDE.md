@@ -71,6 +71,9 @@ if you change behaviour here, verify the same way.
 | The task prompt is at `job_config.ccr.events[0].data.message.content` | Not a top-level field. |
 | `files/{uuid}/contents` serves any file type | `/preview` and `/thumbnail` only render images and PDFs; they 404 on `.pptx`, `.zip`. They are fallbacks. |
 | An account can belong to several organizations | Some return 403 (`Invalid authorization for organization`). Probe and distinguish "empty" from "forbidden", or you will export nothing from the wrong org. |
+| `organization.capabilities` says what an organization is for | Without `chat` it is an API/Console organization: it holds no conversations and answers 403. Filter on this before probing, and never offer it as a choice. |
+| A work organization and a personal one share one email | Read live: `account.email_address` was the same address for a `team_tier_1` seat, a `claude_max` personal organization *and* an API-only one. The email therefore cannot identify the source of an export — `membership.seat_tier`, `capabilities` and the `"<email>'s Organization"` name are what separate them. |
+| `account` in `/api/bootstrap` carries `email_address` and `full_name` | The only place the signed-in identity is available, and it costs nothing: the sign-in check already reads this response. |
 
 ### Claude Desktop's importer
 
@@ -127,6 +130,16 @@ Kept because each cost a debugging round trip and would be re-discovered.
 4. **`Number('')` is `0`** — and `0` is a real range meaning *everything*. An
    empty selection would have exported someone's whole history. Caught by a
    test, which is why `parseExportRange` rejects empty before coercing.
+5. **The organization was picked by size, silently** — whichever had the most
+   conversations won, nothing on screen said which one, and a personal
+   subscription sitting on the same email as a work seat is the common case, not
+   the exotic one. An export that names no account is one you cannot check.
+   Hence `ExportSession.resolveSource`, the account line, and the chooser when
+   more than one is readable.
+6. **A page cannot answer a content script** — `runtime.sendMessage` from the
+   export page reaches the worker and other extension pages, never an injected
+   script. The account choice is relayed with `chrome.tabs.sendMessage`, which
+   is why the worker keeps the claude.ai tab id.
 
 ## The icon
 
