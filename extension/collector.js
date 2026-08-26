@@ -13,9 +13,26 @@
     const days = Number(raw);
     return exportRangeValues.includes(days) ? days : ExportRange.lastThirtyDays;
   }
+  var OrganizationKind = {
+    work: "work",
+    personal: "personal"
+  };
+  var chatCapability = "chat";
+  var personalCapabilities = ["claude_max", "claude_pro"];
+  function canHoldConversations(capabilities) {
+    return capabilities.includes(chatCapability);
+  }
+  function classifyOrganization(organization, email) {
+    if (organization.seatTier !== null) return OrganizationKind.work;
+    if (organization.capabilities.some((c) => personalCapabilities.includes(c))) {
+      return OrganizationKind.personal;
+    }
+    return organization.name === `${email}'s Organization` ? OrganizationKind.personal : OrganizationKind.work;
+  }
   var ExportPhase = {
     idle: "idle",
     awaitingSignIn: "awaitingSignIn",
+    choosingAccount: "choosingAccount",
     running: "running",
     done: "done",
     failed: "failed"
@@ -25,17 +42,30 @@
     label: "",
     percent: 0,
     summary: null,
-    error: null
+    error: null,
+    identity: null,
+    organization: null,
+    candidates: []
   };
   var MessageKind = {
     start: "start",
     requestState: "requestState",
     progress: "progress",
     awaitingSignIn: "awaitingSignIn",
+    awaitingAccountChoice: "awaitingAccountChoice",
+    chooseAccount: "chooseAccount",
+    source: "source",
     finished: "finished",
     failed: "failed"
   };
+  function parseExportMessage(value) {
+    if (typeof value !== "object" || value === null) return null;
+    const kind = value.kind;
+    if (typeof kind !== "string" || !(kind in MessageKind)) return null;
+    return value;
+  }
   var ProgressStop = {
+    account: 1,
     listing: 2,
     chatsStart: 5,
     chatsEnd: 70,
@@ -157,29 +187,40 @@
       this.organizationUuid = organizationUuid;
     }
     /**
-     * Which organization owns the data. An account can belong to several — a
-     * personal one and a work one — and some refuse to be read at all, so the
-     * caller must be able to tell "no chats" from "not allowed".
+     * Who is signed in, and which organizations they belong to.
+     *
+     * The email is read here and shown to the user, because it is the only thing
+     * that names the login an export came from. It is never sent anywhere: the
+     * caller puts it on screen and into the zip, both of which stay on the
+     * machine.
      */
-    static async listOrganizations() {
+    static async readAccount() {
       const bootstrap = await _ClaudeApi.getJson("/api/bootstrap");
-      const memberships = bootstrap.account?.memberships ?? [];
-      return memberships.map((m) => m.organization).filter((o) => typeof o?.uuid === "string");
+      const account = bootstrap.account;
+      if (account === null || account === void 0) {
+        return { email_address: null, full_name: null, memberships: [] };
+      }
+      return account;
     }
     /**
      * Can this organization's conversations be listed at all? Distinguishes an
      * empty organization from one this session may not read, so the caller never
      * silently exports nothing from the wrong place.
+     *
+     * `full` says the first page came back full — the organization holds at least
+     * `count`, not exactly `count`. Only a whole pagination walk knows the total,
+     * and this runs on every candidate before anything is chosen.
      */
     static async probeOrganization(uuid) {
       const path = `/api/organizations/${uuid}/chat_conversations?limit=${conversationPageSize}&offset=0`;
       const response = await fetch(path, { credentials: "include", cache: "no-store" }).catch(
         () => null
       );
-      if (response === null) return { readable: false, status: 0, count: 0 };
-      if (!response.ok) return { readable: false, status: response.status, count: 0 };
+      if (response === null) return { readable: false, status: 0, count: 0, full: false };
+      if (!response.ok) return { readable: false, status: response.status, count: 0, full: false };
       const body = await response.json().catch(() => null);
-      return { readable: true, status: 200, count: Array.isArray(body) ? body.length : 0 };
+      const count = Array.isArray(body) ? body.length : 0;
+      return { readable: true, status: 200, count, full: count >= conversationPageSize };
     }
     /** Every conversation header, following pagination to the end. */
     async listConversations(onPage) {
@@ -398,38 +439,72 @@ ${body}
     skipped = [];
     available = 0;
     async run() {
-      const api = new ClaudeApi(await this.resolveOrganization());
+      const source = await this.resolveSource();
+      this.options.source.announce(source.identity, source.organization);
+      const api = new ClaudeApi(source.organization.uuid);
       const conversations = await this.collectConversations(api);
       const projects = await this.collectProjects(api);
       this.options.progress.report("Reading scheduled tasks", ProgressStop.scheduledTasks);
       const scheduledTasks = await api.listScheduledTasks();
       const assets = await this.collectAssets(api, conversations, projects);
-      return this.buildArchive(conversations, projects, scheduledTasks, assets);
+      return this.buildArchive(source, conversations, projects, scheduledTasks, assets);
     }
     /**
-     * An account can belong to several organizations, and a session is not
-     * always allowed to read all of them. Probing tells "empty" apart from
-     * "forbidden", so a 403 on one never results in silently exporting nothing.
+     * Which account, and which of its organizations.
+     *
+     * An account can belong to several, a session is not always allowed to read
+     * all of them, and — the reason this asks rather than decides — a work
+     * organization and a personal one are usually the same email address. Picking
+     * the largest was silently right most of the time and silently wrong the rest,
+     * with nothing on screen either way.
+     *
+     * Probing still happens for every candidate, because it is the only thing
+     * that tells "empty" apart from "forbidden".
      */
-    async resolveOrganization() {
-      const organizations = await ClaudeApi.listOrganizations();
-      if (organizations.length === 0) {
+    async resolveSource() {
+      this.options.progress.report("Reading your account", ProgressStop.account);
+      const account = await ClaudeApi.readAccount();
+      const identity = {
+        email: account.email_address ?? "",
+        fullName: account.full_name ?? null
+      };
+      const memberships = (account.memberships ?? []).filter(
+        (membership) => typeof membership.organization?.uuid === "string"
+      );
+      if (memberships.length === 0) {
         throw new Error("No organizations on this account. Are you signed in to claude.ai?");
       }
-      const only = organizations[0];
-      if (organizations.length === 1 && only !== void 0) return only.uuid;
       const probes = await Promise.all(
-        organizations.map(async (organization) => ({
-          organization,
-          ...await ClaudeApi.probeOrganization(organization.uuid)
-        }))
+        memberships.filter((membership) => canHoldConversations(membership.organization?.capabilities ?? [])).map(async (membership) => {
+          const organization = membership.organization;
+          if (organization === null || organization === void 0) return null;
+          const name = organization.name ?? "Unnamed organization";
+          const seatTier = membership.seat_tier ?? null;
+          const probe = await ClaudeApi.probeOrganization(organization.uuid);
+          if (!probe.readable || probe.count === 0) return null;
+          return {
+            uuid: organization.uuid,
+            name,
+            kind: classifyOrganization(
+              { name, capabilities: organization.capabilities ?? [], seatTier },
+              identity.email
+            ),
+            seatTier,
+            conversationsSeen: probe.count,
+            moreThanSeen: probe.full
+          };
+        })
       );
-      const usable = probes.filter((p) => p.readable && p.count > 0).sort((a, b) => b.count - a.count);
-      const best = usable[0];
-      if (best === void 0) {
+      const candidates = probes.filter((candidate) => candidate !== null).sort((a, b) => {
+        if (a.kind !== b.kind) return a.kind === OrganizationKind.work ? -1 : 1;
+        return b.conversationsSeen - a.conversationsSeen;
+      });
+      const only = candidates[0];
+      if (only === void 0) {
         throw new Error("None of your organizations returned any conversations.");
       }
-      return best.organization.uuid;
+      if (candidates.length === 1) return { identity, organization: only };
+      return { identity, organization: await this.options.chooser.choose(identity, candidates) };
     }
     async collectConversations(api) {
       const headers = await api.listConversations(
@@ -506,12 +581,24 @@ ${body}
       });
       return downloaded;
     }
-    buildArchive(conversations, projects, scheduledTasks, assets) {
+    buildArchive(source, conversations, projects, scheduledTasks, assets) {
       this.options.progress.report("Building the zip", ProgressStop.buildingArchive);
       const archive = new ZipArchive();
       archive.addJson("conversations.json", conversations);
       archive.addJson("projects.json", projects);
       archive.addJson("users.json", [{ uuid: crypto.randomUUID() }]);
+      archive.addJson("export-source.json", {
+        account: source.identity.email,
+        full_name: source.identity.fullName,
+        organization: {
+          uuid: source.organization.uuid,
+          name: source.organization.name,
+          kind: source.organization.kind,
+          seat_tier: source.organization.seatTier
+        },
+        range_days: this.options.rangeDays,
+        exported_at: (/* @__PURE__ */ new Date()).toISOString()
+      });
       archive.addJson("schedules.json", scheduledTasks ?? { unavailable: true });
       archive.addJson("skipped.json", this.skipped);
       archive.addJson("blocktypes.json", this.mapper.diagnostics);
@@ -558,6 +645,7 @@ ${body}
   };
 
   // src/entry/collector.ts
+  var choiceTimeoutMs = 10 * 6e4;
   function post(message) {
     try {
       chrome.runtime.sendMessage(message);
@@ -571,6 +659,39 @@ ${body}
         label,
         percent: Math.min(maxInFlightPercent, Math.round(percent))
       });
+    }
+  };
+  var MessageSource = class {
+    announce(identity, organization) {
+      post({ kind: MessageKind.source, identity, organization });
+    }
+  };
+  var MessageChooser = class {
+    async choose(identity, candidates) {
+      post({ kind: MessageKind.awaitingAccountChoice, identity, candidates });
+      const uuid = await new Promise((resolve) => {
+        let timer;
+        const listener = (raw) => {
+          const message = parseExportMessage(raw);
+          if (message === null || message.kind !== MessageKind.chooseAccount) return;
+          clearTimeout(timer);
+          chrome.runtime.onMessage.removeListener(listener);
+          resolve(message.organizationUuid);
+        };
+        timer = setTimeout(() => {
+          chrome.runtime.onMessage.removeListener(listener);
+          resolve(null);
+        }, choiceTimeoutMs);
+        chrome.runtime.onMessage.addListener(listener);
+      });
+      if (uuid === null) {
+        throw new Error("No account was picked, so nothing was exported. Start again when ready.");
+      }
+      const chosen = candidates.find((candidate) => candidate.uuid === uuid);
+      if (chosen === void 0) {
+        throw new Error("That account is no longer one of the options. Start again.");
+      }
+      return chosen;
     }
   };
   var DownloadSink = class {
@@ -587,7 +708,9 @@ ${body}
     const session = new ExportSession({
       rangeDays: parseExportRange(globalThis.__claudeExportRangeDays ?? ""),
       progress: new MessageProgress(),
-      archive: new DownloadSink()
+      archive: new DownloadSink(),
+      chooser: new MessageChooser(),
+      source: new MessageSource()
     });
     try {
       post({ kind: MessageKind.finished, summary: await session.run() });
