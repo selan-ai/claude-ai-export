@@ -1,6 +1,6 @@
 {
   "name": "claude-ai-export",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Export claude.ai chats, projects, attachments and scheduled tasks to a local zip.",
   "type": "module",

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Claude AI Export \u2014 chats, projects & tasks",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Export claude.ai chats, projects, attachments and scheduled tasks to a local zip. Runs in your browser; nothing is uploaded.",
   "icons": {
     "16": "icons/icon-16.png",
