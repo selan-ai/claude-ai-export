@@ -14,7 +14,9 @@ for anyone who wants a local copy of their own conversations.
 
 ## 1. Export
 
-**Chrome Web Store** — pending review. Until it clears, load it directly:
+**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/claude-ai-export-%E2%80%94-chats/gkhecmfjfbojoceollmpjkphlophoiok)**
+
+Or load it from source:
 
 1. Download or clone this repository
 2. `chrome://extensions` → turn on **Developer mode**
